@@ -22,7 +22,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 In omp:
 ```
-/marketplace add samettemizer/nestiworks-laravel
+/marketplace add samettemizer/nestiworks
 /marketplace install --scope project laravel@nestiworks
 ```
 

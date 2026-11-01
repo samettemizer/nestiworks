@@ -12,11 +12,5 @@
 	"keywords": ["omp", "omp-plugin", "agents", "pi-plugin"],
 	"scripts": {
 		"test": "bun test"
-	},
-	"omp": {
-		"extensions": [
-			"./python/src/cto.ts",
-			"./laravel/src/cto.ts"
-		]
 	}
 }
