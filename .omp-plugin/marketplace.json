@@ -1,0 +1,24 @@
+{
+	"name": "nestiworks",
+	"metadata": {
+		"description": "CTO team modes for programming/script languages. Agents: developer, reviewer or advisor subagents with Nesti escalation."
+	},
+	"plugins": [
+		{
+			"name": "python",
+			"source": "./python",
+			"description": "Python team mode for omp: developer, reviewer subagents",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "laravel",
+			"source": "./laravel",
+			"description": "Laravel team mode for omp: developer, reviewer and advisor subagents",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		}
+	]
+}

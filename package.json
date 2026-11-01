@@ -1,0 +1,22 @@
+{
+	"name": "nestiworks",
+	"version": "1.0.0",
+	"description": "CTO team modes for programming/script languages. Agents: developer, reviewer or advisor subagents with Nesti escalation.",
+	"license": "MIT",
+	"author": "Nesti Contributors",
+	"contributors": [
+		"Hakan Keten   <ketenhakan.hk@gmail.com>",
+		"Samet Temizer <info@stemizer.net>"
+	],
+	"type": "module",
+	"keywords": ["omp", "omp-plugin", "agents", "pi-plugin"],
+	"scripts": {
+		"test": "bun test"
+	},
+	"omp": {
+		"extensions": [
+			"./python/src/cto.ts",
+			"./laravel/src/cto.ts"
+		]
+	}
+}
