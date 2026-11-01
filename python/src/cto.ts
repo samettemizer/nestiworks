@@ -71,7 +71,7 @@ export default async function teamMode(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("cto", {
-		description: "CTO python team. Use: /cto [on|off|default on|default off]",
+		description: "CTO Python team. Usage: /cto [on|off|default on|default off]",
 		handler: async (args, ctx) => {
 			const words = args.trim().split(/\s+/).filter(Boolean);
 			const [a, b] = words;

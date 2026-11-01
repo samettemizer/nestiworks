@@ -345,7 +345,7 @@ export default async function teamMode(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("cto", {
-		description: "CTO team mode: /cto [on|off|default on|default off]",
+		description: "CTO Laravel/Vue team. Usage: /cto [on|off|default on|default off]",
 		handler: async (args, ctx) => {
 			const words = args.trim().split(/\s+/).filter(Boolean);
 			const [a, b] = words;
