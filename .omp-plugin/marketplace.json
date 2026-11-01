@@ -3,6 +3,9 @@
 	"metadata": {
 		"description": "CTO team modes for programming/script languages. Agents: developer, reviewer or advisor subagents with Nesti escalation."
 	},
+	"owner": {
+		"name": "github.com/samettemizer"
+	},
 	"plugins": [
 		{
 			"name": "python",
