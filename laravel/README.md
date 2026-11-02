@@ -42,7 +42,7 @@ bun test
 
 | Command | Effect |
 | --- | --- |
-| `/cto` | Show the effective state and where it comes from: `session`, `default`, or `off` |
+| `/cto`, `/cto status` | Show the effective state and where it comes from: `session`, `default`, or `off` |
 | `/cto on` | Turn CTO mode on for the current session |
 | `/cto off` | Turn CTO mode off for the current session |
 | `/cto default on` | New sessions in this profile start with CTO mode on |

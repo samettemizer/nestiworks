@@ -5,7 +5,7 @@ import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 export const STATE_ENTRY = "nestiworks-laravel.state";
 export const DEFAULT_FILE = "nestiworks-laravel.json";
 export const ESCALATION_ENTRY = "nestiworks-laravel.escalation";
-const USAGE = "Usage: /cto [on|off|default on|default off]";
+const USAGE = "Usage: /cto [status|on|off|default on|default off]";
 
 export type Source = "session" | "default" | "off";
 export type Escalation = { issue: number; url: string; status: "open" | "closed" | "handed_off" };
@@ -345,11 +345,11 @@ export default async function teamMode(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("cto", {
-		description: "CTO Laravel/Vue team. Usage: /cto [on|off|default on|default off]",
+		description: `CTO Laravel/Vue team. ${USAGE}`,
 		handler: async (args, ctx) => {
 			const words = args.trim().split(/\s+/).filter(Boolean);
 			const [a, b] = words;
-			if (words.length === 0) {
+			if (words.length === 0 || (words.length === 1 && a === "status")) {
 				ctx.ui.notify(`CTO mode: ${describe()}`, "info");
 			} else if (words.length === 1 && (a === "on" || a === "off")) {
 				session = a === "on";
