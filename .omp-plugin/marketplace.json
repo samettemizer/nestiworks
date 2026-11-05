@@ -46,6 +46,14 @@
 			"version": "1.0.0",
 			"license": "MIT",
 			"category": "development"
+		},
+		{
+			"name": "typescript",
+			"source": "./typescript",
+			"description": "TypeScript team mode for omp: developer, reviewer subagents",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
 		}
 	]
 }
