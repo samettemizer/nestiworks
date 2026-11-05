@@ -1,10 +1,14 @@
 # nestiworks-python
 
-An [omp](https://omp.sh) plugin that adds an opt-in **CTO team mode**.
+An [omp](https://omp.sh) plugin that adds an opt-in **CTO team mode** for Python projects.
 
 When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `developer` subagent, approves the developer's plan, sends the result to a `reviewer` subagent, relays `MUST_FIX` items until the review passes, and then reports back to you. It prints a status line at every phase change (`▶ [n/5 Phase] ...`) in your language.
 
 When CTO mode is off, nothing is injected and omp behaves like the default agent.
+
+## Python focus
+
+The developer keeps to the project's `requires-python` floor and its own toolchain (uv/poetry/pip-tools, pytest, ruff/mypy as configured), manages resources with `with`, and never blocks inside `async def`. The reviewer blocks event-loop blocking calls, mutable defaults, swallowed exceptions, leaked resources and string-built SQL or shell. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
 
 ## What's inside
 
@@ -58,7 +62,7 @@ CTO rules are injected only into the main session. Subagents, including `develop
 
 ## Commits
 
-Only the `developer` agent commits, and only when the CTO sends `COMMIT` (the CTO does so only when you ask for a commit). Messages follow Conventional Commits and are validated with [commitizen](https://commitizen-tools.github.io/commitizen/) (`cz check`) before `git commit`; a project's own `[tool.commitizen]` config is respected. Requires `cz` on `PATH` (`pipx install commitizen`). The developer never runs `cz bump`, tags, or pushes unless told to.
+Only the `developer` agent commits, and only when the CTO sends `COMMIT` (the CTO does so only when you ask for a commit). Messages follow Conventional Commits and are validated with [commitizen](https://commitizen-tools.github.io/commitizen/) (`cz check`) before `git commit`; a project's own commitizen config is respected. Commits use a `-- <paths>` pathspec, so files you staged yourself stay out. Requires `cz` on `PATH` (`pipx install commitizen`). The developer never runs `cz bump`, tags, or pushes unless told to.
 
 ## ⚠️ Agent override
 
