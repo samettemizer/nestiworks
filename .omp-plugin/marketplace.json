@@ -38,6 +38,14 @@
 			"version": "1.0.0",
 			"license": "MIT",
 			"category": "development"
+		},
+		{
+			"name": "rust",
+			"source": "./rust",
+			"description": "Rust team mode for omp: developer, reviewer subagents",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
 		}
 	]
 }
