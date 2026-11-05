@@ -94,6 +94,14 @@
 			"version": "1.0.0",
 			"license": "MIT",
 			"category": "development"
+		},
+		{
+			"name": "ruby",
+			"source": "./ruby",
+			"description": "Ruby team mode for omp: developer, reviewer subagents",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
 		}
 	]
 }
