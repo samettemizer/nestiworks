@@ -1,0 +1,9 @@
+{
+	"name": "swift",
+	"version": "1.0.0",
+	"type": "module",
+	"license": "MIT",
+	"omp": {
+		"extensions": ["./src/cto.ts"]
+	}
+}
