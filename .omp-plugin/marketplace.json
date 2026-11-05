@@ -30,6 +30,14 @@
 			"version": "1.0.0",
 			"license": "MIT",
 			"category": "development"
+		},
+		{
+			"name": "go",
+			"source": "./go",
+			"description": "Go team mode for omp: developer, reviewer subagents",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
 		}
 	]
 }
