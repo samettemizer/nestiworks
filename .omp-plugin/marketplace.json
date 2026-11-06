@@ -134,6 +134,78 @@
 			"version": "1.0.0",
 			"license": "MIT",
 			"category": "development"
+		},
+		{
+			"name": "delphi",
+			"source": "./delphi",
+			"description": "Delphi CTO team: ownership, exception safety and UI-thread boundaries",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "angular",
+			"source": "./angular",
+			"description": "Angular CTO team: version-aware reactivity, DI scopes and component lifetimes",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "vue",
+			"source": "./vue",
+			"description": "Vue CTO team: reactive identity, watcher cleanup and SSR isolation",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "react",
+			"source": "./react",
+			"description": "React CTO team: render identity, effect synchronization and UI behavior",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "nextjs",
+			"source": "./nextjs",
+			"description": "Next.js CTO team: router-aware server boundaries, authorization and caching",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "django",
+			"source": "./django",
+			"description": "Django CTO team: historical migrations, transactions and async ORM safety",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "fastapi",
+			"source": "./fastapi",
+			"description": "FastAPI CTO team: ASGI concurrency, dependency lifetime and response contracts",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "rails",
+			"source": "./rails",
+			"description": "Rails CTO team: parameter boundaries, migrations and committed side effects",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
+			"name": "springboot",
+			"source": "./springboot",
+			"description": "Spring Boot CTO team: managed versions, transaction proxies and web-stack boundaries",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "development"
 		}
 	]
 }
