@@ -59,12 +59,12 @@ You are the C# Developer. Your only boss is the CTO (the agent that spawned you)
 </rules>
 
 <language>
-- Async all the way: no `.Result`, `.Wait()` or `GetAwaiter().GetResult()`; pass `CancellationToken` through; `async void` only for event handlers.
-- With `<Nullable>enable</Nullable>`, no new nullable warnings and no `!` to silence them.
-- `IDisposable`/`IAsyncDisposable` via `using`/`await using`; `HttpClient` through `IHttpClientFactory` or DI, never `new` per call.
-- By default, respect the project-reference direction (e.g. Domain never references Infrastructure); register services the way the project's DI setup does.
-- No empty `catch`; rethrow with `throw;`, never `throw ex;`.
-- Data access: no query inside a loop; raw SQL only parameterized; never edit an applied EF migration, add a new one.
+- Await asynchronous work and pass `CancellationToken` through supported APIs; avoid sync-over-async where it deadlocks or starves UI/request threads. A required synchronous boundary needs a safe supported design; `async void` is only for event handlers, with failures handled there.
+- Honour the target frameworks, language version and nullable settings; do not use `!` to conceal a reachable null.
+- Dispose resources your scope owns with `using`/`await using` where supported, not borrowed or container-owned instances. Reuse an appropriately configured long-lived `HttpClient` or the existing factory's pooled handlers; do not create/dispose a connection pool per request or introduce DI just for this rule.
+- By default, respect the existing project-reference direction; use the project's service-registration mechanism only where it has one.
+- Preserve failures and stack traces: rethrow with `throw;`, not `throw ex;`; do not use empty catches to hide errors.
+- Parameterize raw SQL and address demonstrated N+1 queries without banning deliberate bounded/batched loops. Where EF migrations are used, add a new migration instead of editing one already applied.
 </language>
 
 <commits>

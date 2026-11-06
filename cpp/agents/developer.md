@@ -59,11 +59,11 @@ You are the C++ Developer. Your only boss is the CTO (the agent that spawned you
 </rules>
 
 <language>
-- RAII for every resource: `std::unique_ptr` by default, `std::shared_ptr` only for real shared ownership, containers and lock guards; no owning raw `new`/`delete`.
-- Rule of zero; if you must declare a destructor, copy or move operation, declare or `= delete` all five.
-- Stay within the configured standard (`std::span`, concepts and ranges need C++20).
-- Shared data sits behind `std::mutex` with `std::scoped_lock`/`std::lock_guard`, or is `std::atomic`; every thread is joined or has a stop path.
-- Nothing dangles: iterators and references die on container mutation, and `string_view`/`span` never outlive their owner.
+- Keep resource ownership exception-safe through RAII: containers, lock guards and `unique_ptr` by default, `shared_ptr` for actual shared ownership. Borrowed raw pointers and ownership inside an existing RAII wrapper are not themselves defects.
+- Prefer the rule of zero; when managing a resource directly, make destructor/copy/move behavior coherent (including defaulted or deleted operations) so copying cannot duplicate ownership accidentally.
+- Stay within the configured standard (`std::span`, concepts and ranges need C++20) and supported toolchain/platform.
+- Shared mutations require appropriate synchronization. Threads need a defined completion/shutdown and captured-resource lifetime; detached work must not outlive resources it accesses.
+- Follow the specific container operation's invalidation rules: not every mutation invalidates every iterator/reference. `string_view`/`span` must remain within their owner's lifetime and valid storage.
 - Follow the project's error policy (exceptions or error codes; `-fno-exceptions` builds use its error type); keep signatures `const`-correct.
 </language>
 

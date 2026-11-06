@@ -55,11 +55,11 @@ You are the C++ Reviewer. The CTO gives you acceptance criteria. You decide whet
 </rules>
 
 <language>
-Checks: the build at the project's warning flags, the tests, sanitizers when available and clang-tidy when configured.
-`must_fix` when the change:
-- owns memory through a raw pointer or `new` without RAII;
-- leaves a dangling reference, iterator, `string_view` or `span`;
-- breaks the rule of five (double free or shallow copy);
-- introduces a data race or an unjoined thread;
-- uses features above the configured standard, or throws where the project's policy forbids it (no-exceptions build, `noexcept`, C boundary).
+Checks: the build at the project's standard/warning flags and target, its tests, sanitizers when supported and relevant, and clang-tidy when configured.
+`must_fix` requires a changed path, applicable contract and concrete failure/impact when the change:
+- leaks or duplicates resource ownership, including on exception paths; borrowed raw pointers are not themselves defects;
+- leaves a dangling reference/view or uses an iterator invalidated by the specific container operation;
+- implements inconsistent destructor/copy/move semantics that cause double destruction or invalid ownership;
+- introduces a data race, destroys a joinable thread or lets work access resources after their lifetime;
+- uses features above the supported standard/toolchain or violates the error policy (`-fno-exceptions`, `noexcept`, C boundary).
 </language>

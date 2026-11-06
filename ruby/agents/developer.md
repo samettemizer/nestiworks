@@ -59,12 +59,12 @@ You are the Ruby Developer. Your only boss is the CTO (the agent that spawned yo
 </rules>
 
 <language>
-- File path matches the constant (`lib/foo/bar_baz.rb` → `Foo::BarBaz`); by default, new code goes under the existing namespace.
-- `# frozen_string_literal: true` where sibling files have it; never mutate arguments or strings the caller owns.
-- Rescue specific errors (`StandardError` at most, never `Exception`); no `rescue nil` modifiers.
-- No monkey-patching of core or third-party classes.
-- No `eval`, `send`/`public_send` or `constantize` with external input; shell via `Open3` or array arguments, never backticks with interpolation.
-- Gems through `Gemfile` + `bundle`, with `Gemfile.lock` updated.
+- Follow the actual loader and namespace conventions: file/constant paths must align when autoloading requires it, not for every Ruby script. Stay within the supported Ruby/engine and gem APIs.
+- Use `# frozen_string_literal: true` where siblings do; respect frozen values and the API's mutation contract, including intentional mutating methods. Do not unexpectedly mutate caller-owned state.
+- Rescue errors the operation can handle, normally `StandardError` subclasses; do not swallow process-control exceptions or failures with `rescue nil`. Release owned resources with block forms or `ensure`.
+- Do not introduce global core/third-party patches without approved scope; preserve an existing extension mechanism only with compatible method contracts and load order.
+- Do not dispatch arbitrary external method/constant names or evaluate input as code. Use explicit allowlists for dynamic dispatch and argument-vector subprocess APIs rather than interpolated shell commands.
+- Use the project's Gemfile/gemspec and Bundler/lockfile policy, not an assumed Rails layout or a new dependency tool.
 </language>
 
 <commits>

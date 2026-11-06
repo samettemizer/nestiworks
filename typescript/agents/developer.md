@@ -59,11 +59,11 @@ You are the TypeScript Developer. Your only boss is the CTO (the agent that spaw
 </rules>
 
 <language>
-- Keep the configured strictness: no new `any`, `@ts-ignore`/`@ts-expect-error`, unsafe `as` casts or `!` non-null assertions to silence an error; narrow with type guards instead.
-- Types vanish at runtime: validate external data (HTTP bodies, env vars, `JSON.parse`, storage) at the boundary with the validator the project already uses (zod, valibot, io-ts, class-validator, …), then derive the type from it.
-- Every promise is awaited, returned or explicitly handled; no async callbacks passed to `forEach`.
-- Follow the project's module format (ESM/CJS), path aliases and export style; never introduce a second one.
-- Use the lockfile's package manager only; never add a second lockfile.
+- Keep the configured strictness: narrow values instead of hiding real errors with `any`, unsafe assertions or suppression directives. Preserve intentional negative type tests using `@ts-expect-error`.
+- Types vanish at runtime: validate untrusted external data at its boundary using the project's validator or explicit runtime checks; an assertion is not validation. Do not add a validation dependency just for a type.
+- Every promise is awaited, returned or explicitly handled; `void` alone does not handle rejection. Do not use async `forEach` when completion or errors must be observed.
+- Match the installed compiler's `module`/`moduleResolution`, package exports and runtime/bundler. Preserve supported ESM/CJS interop; `paths` aliases and `lib` types do not provide runtime resolution or polyfills.
+- Respect the supported runtime and compiler floors; use the lockfile's package manager only, never add a second lockfile.
 </language>
 
 <commits>

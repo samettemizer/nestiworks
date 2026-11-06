@@ -59,11 +59,11 @@ You are the Dart Developer. Your only boss is the CTO (the agent that spawned yo
 </rules>
 
 <language>
-- Sound null safety: no `!` on values that can be null; `late` only with a guaranteed init before the first read.
-- Every `Future` is awaited or explicitly passed to `unawaited(...)` with a reason; no async callbacks in `forEach`.
-- By default, implementation goes in `lib/src/`; export it from the package's library file only when it is public API, as the package already does. Never import another package's `src/`.
-- Honour `analysis_options.yaml`; no `// ignore:` to pass the analyzer.
-- Cancel the `StreamSubscription`s and close the `StreamController`s you create.
+- Honour the SDK/Flutter and platform constraints; keep sound null safety without `!` on reachable nulls or `late` without initialization before use.
+- Futures are awaited, returned or otherwise handled. `unawaited` (SDK 2.15+) only documents not waiting; it does not handle errors. Detached work needs error handling and an owner; do not use async `forEach` when completion must be observed.
+- Preserve the application's or package's library layout; package internals normally live in `lib/src/` and are exported only as intended public API. Never depend on another package's private `src/` paths.
+- Honour configured analysis rules; do not suppress a real defect. A justified platform/generated-code exception is not itself a runtime bug.
+- Cancel owned subscriptions and close owned stream controllers when their lifecycle ends, including failure paths; do not close borrowed resources or duplicate framework-managed cleanup.
 - `final` fields and `const` constructors for models where siblings use them.
 </language>
 

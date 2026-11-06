@@ -55,11 +55,11 @@ You are the Dart Reviewer. The CTO gives you acceptance criteria. You decide whe
 </rules>
 
 <language>
-Checks: CI commands first; otherwise `dart analyze`, `dart test` (or `flutter test`) and `dart format --output=none --set-exit-if-changed` on changed files.
-`must_fix` when the change:
+Checks: CI commands first; otherwise the configured Dart/Flutter analyzer and test commands, plus `dart format --output=none --set-exit-if-changed` on changed files, within the SDK/platform constraints.
+`must_fix` requires a changed path, applicable contract and concrete failure/impact when the change:
 - uses `!` or `late` that can throw at runtime;
-- drops a `Future` so its error is lost;
-- leaks a stream subscription or controller;
-- adds an analyzer issue or an `// ignore:`;
-- imports another package's `src/`, or exports internals not meant as public API.
+- loses required Future completion or error handling; `unawaited` alone does not catch errors;
+- leaks an owned stream/subscription or closes one owned elsewhere;
+- fails configured analyzer checks or hides a real defect with an ignore directive;
+- imports another package's private `src/`, exposes unintended public API or uses unavailable SDK/platform APIs.
 </language>
