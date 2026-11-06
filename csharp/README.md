@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## C# focus
 
-The developer keeps async all the way with `CancellationToken`, honours nullable reference types, disposes what it creates and respects the solution's project-reference layering. The reviewer runs `dotnet build`/`dotnet test` and blocks sync-over-async, `throw ex;`, undisposed resources, nullable escapes and layer violations. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer keeps async all the way with `CancellationToken`, honours nullable reference types, disposes what it creates and respects the solution's project-reference layering. The reviewer runs `dotnet build`/`dotnet test` and blocks sync-over-async, `throw ex;`, undisposed resources, nullable escapes and layer violations. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

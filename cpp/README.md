@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## C++ focus
 
-The developer uses RAII and the rule of zero, stays within the configured C++ standard, guards shared data and never lets views or iterators outlive their owners. The reviewer builds at the project's flags, runs the tests under sanitizers when available and blocks raw ownership, dangling references, rule-of-five bugs and data races. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer uses RAII and the rule of zero, stays within the configured C++ standard, guards shared data and never lets views or iterators outlive their owners. The reviewer builds at the project's flags, runs the tests under sanitizers when available and blocks raw ownership, dangling references, rule-of-five bugs and data races. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

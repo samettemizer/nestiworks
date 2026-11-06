@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Python focus
 
-The developer keeps to the project's `requires-python` floor and its own toolchain (uv/poetry/pip-tools, pytest, ruff/mypy as configured), manages resources with `with`, and never blocks inside `async def`. The reviewer blocks event-loop blocking calls, mutable defaults, swallowed exceptions, leaked resources and string-built SQL or shell. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer keeps to the project's `requires-python` floor and its own toolchain (uv/poetry/pip-tools, pytest, ruff/mypy as configured), manages resources with `with`, and never blocks inside `async def`. The reviewer blocks event-loop blocking calls, mutable defaults, swallowed exceptions, leaked resources and string-built SQL or shell. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

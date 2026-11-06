@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Rust focus
 
-The developer propagates errors with `?` instead of panicking, justifies every `unsafe` block with a `SAFETY` comment, keeps blocking work and sync locks away from `.await` points and stays within the crate's edition and `rust-version`. The reviewer runs clippy and tests with CI's flags and blocks panics on input paths, unsound `unsafe` and lock-across-await bugs. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer propagates errors with `?` instead of panicking, justifies every `unsafe` block with a `SAFETY` comment, keeps blocking work and sync locks away from `.await` points and stays within the crate's edition and `rust-version`. The reviewer runs clippy and tests with CI's flags and blocks panics on input paths, unsound `unsafe` and lock-across-await bugs. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

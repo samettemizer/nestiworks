@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Swift focus
 
-The developer avoids force unwraps, keeps UI on `@MainActor` and shared state in actors or `Sendable` types, breaks retain cycles with `weak` and guards newer APIs with `#available`. The reviewer builds and tests with SPM or `xcodebuild` and blocks crash-prone unwraps, off-main UI updates, data races and retain cycles. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer avoids force unwraps, keeps UI on `@MainActor` and shared state in actors or `Sendable` types, breaks retain cycles with `weak` and guards newer APIs with `#available`. The reviewer builds and tests with SPM or `xcodebuild` and blocks crash-prone unwraps, off-main UI updates, data races and retain cycles. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

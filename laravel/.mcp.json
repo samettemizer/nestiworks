@@ -1,1 +1,1 @@
-{"mcpServers":{"nesti":{"type":"stdio","command":"docker","args":["exec","-i","nesti-mcp","python","-m","mcp_server.server"]}}}
+{"mcpServers":{"nesti":{"type":"stdio","command":"nesti","args":["mcp"]}}}

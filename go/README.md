@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Go focus
 
-The developer gives every goroutine an exit, threads `context.Context` through I/O, wraps errors with `%w` and respects the module's package boundaries (`internal/`, no import cycles). The reviewer runs vet and race-enabled tests and blocks goroutine leaks, ignored errors, data races and unclosed bodies or rows. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer gives every goroutine an exit, threads `context.Context` through I/O, wraps errors with `%w` and respects the module's package boundaries (`internal/`, no import cycles). The reviewer runs vet and race-enabled tests and blocks goroutine leaks, ignored errors, data races and unclosed bodies or rows. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

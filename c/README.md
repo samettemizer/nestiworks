@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## C focus
 
-The developer gives every allocation one owner and frees it on every path, keeps lengths with buffers, checks every failing call and avoids undefined behaviour within the project's C standard. The reviewer builds with the project's warning flags, runs the tests under sanitizers or Valgrind when available and blocks leaks, overflows, unchecked errors and UB. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer gives every allocation one owner and frees it on every path, keeps lengths with buffers, checks every failing call and avoids undefined behaviour within the project's C standard. The reviewer builds with the project's warning flags, runs the tests under sanitizers or Valgrind when available and blocks leaks, overflows, unchecked errors and UB. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

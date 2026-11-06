@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Dart focus
 
-The developer keeps sound null safety without `!`/`late` shortcuts, awaits or explicitly `unawaited()`s every future, closes streams and respects the `lib/src` public/private split. The reviewer runs `dart analyze`, the tests and `dart format` and blocks runtime null errors, lost futures and leaked subscriptions. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer keeps sound null safety without `!`/`late` shortcuts, awaits or explicitly `unawaited()`s every future, closes streams and respects the `lib/src` public/private split. The reviewer runs `dart analyze`, the tests and `dart format` and blocks runtime null errors, lost futures and leaked subscriptions. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

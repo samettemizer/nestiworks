@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Ruby focus
 
-The developer keeps file paths and constants aligned, rescues specific errors only, never monkey-patches core classes and keeps external input away from `eval`, `send` and shell interpolation. The reviewer runs the project's RSpec/Minitest and RuboCop and blocks broad rescues, dynamic-dispatch injection and autoload-breaking names. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer keeps file paths and constants aligned, rescues specific errors only, never monkey-patches core classes and keeps external input away from `eval`, `send` and shell interpolation. The reviewer runs the project's RSpec/Minitest and RuboCop and blocks broad rescues, dynamic-dispatch injection and autoload-breaking names. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## TypeScript focus
 
-The developer keeps the project's `tsconfig` strictness (no new `any`, `@ts-ignore`, unsafe `as` or `!`), validates external data at runtime with the project's own validator and uses the lockfile's package manager. The reviewer runs the repo's typecheck, lint and test scripts and blocks type escapes, unvalidated input and floating promises. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer keeps the project's `tsconfig` strictness (no new `any`, `@ts-ignore`, unsafe `as` or `!`), validates external data at runtime with the project's own validator and uses the lockfile's package manager. The reviewer runs the repo's typecheck, lint and test scripts and blocks type escapes, unvalidated input and floating promises. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

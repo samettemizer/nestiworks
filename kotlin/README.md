@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## Kotlin focus
 
-The developer avoids `!!`, keeps coroutines structured (no `GlobalScope`/`runBlocking`, blocking I/O on `Dispatchers.IO`, `CancellationException` rethrown) and uses the project's version catalog. The reviewer runs Gradle `check` plus configured detekt/ktlint/lint and blocks null crashes, leaked coroutines and dispatcher misuse. Both agents work inside your project's existing layout and toolchain; nothing is restructured toward a framework default.
+The developer avoids `!!`, keeps coroutines structured (no `GlobalScope`/`runBlocking`, blocking I/O on `Dispatchers.IO`, `CancellationException` rethrown) and uses the project's version catalog. The reviewer runs Gradle `check` plus configured detekt/ktlint/lint and blocks null crashes, leaked coroutines and dispatcher misuse. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 
