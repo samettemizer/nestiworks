@@ -2,7 +2,7 @@
 
 An [omp](https://omp.sh) plugin that adds an opt-in **CTO team mode** for TypeScript projects.
 
-When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `developer` subagent, approves the developer's plan, sends the result to a `reviewer` subagent, relays `MUST_FIX` items until the review passes, and then reports back to you. It prints a status line at every phase change (`▶ [n/5 Phase] ...`) in your language.
+When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `developer` subagent, approves the developer's plan, sends the result to a `reviewer` subagent, relays `MUST_FIX` items until the review passes, then automatically delegates the approved commit and waits for its hash before reporting back to you (unless you explicitly forbid commits or there is no change to commit). It prints a status line at every phase change (`▶ [n/5 Phase] ...`) in your language.
 
 When CTO mode is off, nothing is injected and omp behaves like the default agent.
 
@@ -62,7 +62,7 @@ CTO rules are injected only into the main session. Subagents, including `develop
 
 ## Commits
 
-Only the `developer` agent commits, and only when the CTO sends `COMMIT` (the CTO does so only when you ask for a commit). Messages follow Conventional Commits and are validated with [commitizen](https://commitizen-tools.github.io/commitizen/) (`cz check`) before `git commit`; a project's own commitizen config is respected. Commits use a `-- <paths>` pathspec, so files you staged yourself stay out. Requires `cz` on `PATH` (`pipx install commitizen`). The developer never runs `cz bump`, tags, or pushes unless told to.
+After the reviewer approves and the CTO accepts the criteria, the CTO automatically sends `COMMIT` to the developer; you do not need to request it separately. Only the developer commits, and the CTO waits for `status: "committed"` with actual commit hashes before reporting completion. An explicit no-commit instruction wins; read-only, investigation and no-change tasks create no empty commits. Messages follow Conventional Commits and must pass [Commitizen](https://commitizen-tools.github.io/commitizen/) `cz check` using the repository config. Missing `cz` or a failed commit blocks completion. Explicit approved-file pathspecs keep unrelated staged files out; overlapping user edits must be resolved rather than swept in. Pushes, tags, branches and version bumps are not automatic.
 
 ## ⚠️ Agent override
 
