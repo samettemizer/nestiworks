@@ -8,7 +8,7 @@ When CTO mode is off, nothing is injected and omp behaves like the default agent
 
 ## PHP focus
 
-The developer follows the PSR-4 map and the `require.php` floor, uses strict types where the project does, prepared statements for SQL and context escaping for output. The reviewer runs PHPUnit/Pest and PHPStan/Psalm at the configured level and blocks injection, XSS, error suppression and autoload breaks. Laravel projects use the `laravel` pack. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
+The developer follows the PSR-4 map and the `require.php` floor, uses strict types where the project does, prepared statements for SQL and context escaping for output. The reviewer runs PHPUnit/Pest and PHPStan/Psalm at the configured level and blocks injection, XSS, error suppression and autoload breaks. Both agents preserve your project's existing architecture/layout and toolchain by default; the developer implements architecture changes only when the CTO explicitly requests them and the approved plan covers them, and the reviewer checks against that approved target. This is not permission for unilateral restructuring or for bypassing safety and other language rules.
 
 ## What's inside
 

@@ -11,7 +11,7 @@
 			"name": "generic",
 			"source": "./generic",
 			"description": "Generic team mode for omp: developer, reviewer subagents",
-			"version": "1.0.0",
+			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"
 		},
@@ -19,7 +19,7 @@
 			"name": "python",
 			"source": "./python",
 			"description": "Python team mode for omp: developer, reviewer subagents",
-			"version": "1.1.0",
+			"version": "1.1.2",
 			"license": "MIT",
 			"category": "development"
 		},
@@ -27,7 +27,7 @@
 			"name": "laravel",
 			"source": "./laravel",
 			"description": "Laravel team mode for omp: developer, reviewer and advisor subagents",
-			"version": "1.0.0",
+			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
 		},
@@ -67,7 +67,7 @@
 			"name": "php",
 			"source": "./php",
 			"description": "PHP team mode for omp: developer, reviewer subagents",
-			"version": "1.0.0",
+			"version": "1.1.2",
 			"license": "MIT",
 			"category": "development"
 		},
