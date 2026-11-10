@@ -8,6 +8,14 @@
 	},
 	"plugins": [
 		{
+			"name": "generic",
+			"source": "./generic",
+			"description": "Generic team mode for omp: developer, reviewer subagents",
+			"version": "1.0.1",
+			"license": "MIT",
+			"category": "development"
+		},
+		{
 			"name": "angular",
 			"source": "./angular",
 			"description": "Angular CTO team: version-aware reactivity, DI scopes and component lifetimes",
@@ -68,14 +76,6 @@
 			"source": "./fastapi",
 			"description": "FastAPI CTO team: ASGI concurrency, dependency lifetime and response contracts",
 			"version": "1.1.0",
-			"license": "MIT",
-			"category": "development"
-		},
-		{
-			"name": "generic",
-			"source": "./generic",
-			"description": "Generic team mode for omp: developer, reviewer subagents",
-			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"
 		},
