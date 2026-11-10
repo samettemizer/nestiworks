@@ -7,6 +7,7 @@ Improvements and documentation contributions are welcome.
 - Keep changes small and consistent with the existing project.
 - Briefly explain what changed and how you checked it.
 - Use the commit format below for all commits in your PR.
+- The **Commit messages** check validates every commit title.
 
 ## Commit messages
 
