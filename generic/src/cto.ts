@@ -65,7 +65,7 @@ export default async function teamMode(pi: ExtensionAPI) {
 	pi.on("session_tree", navigate);
 
 	pi.on("before_agent_start", async (event, ctx) => {
-		// Subagents (developer, reviewer, ...) rebind this factory; only the main session is the CTO.
+		// Subagents (nesti-developer, nesti-reviewer, ...) rebind this factory; only the main session is the CTO.
 		if (ctx.agent.kind !== "main" || !effective(session, def).enabled) return;
 		return { systemPrompt: [...event.systemPrompt, rules] };
 	});
