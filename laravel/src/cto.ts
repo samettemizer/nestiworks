@@ -298,7 +298,7 @@ export default async function teamMode(pi: ExtensionAPI) {
 	pi.on("session_tree", navigate);
 
 	pi.on("before_agent_start", async (event, ctx) => {
-		// Subagents (developer, reviewer, ...) rebind this factory; only the main session is the CTO.
+		// Subagents (nesti-developer, nesti-reviewer, ...) rebind this factory; only the main session is the CTO.
 		if (ctx.agent.kind !== "main" || !effective(session, def).enabled) return;
 		const issueLine = escalation?.status === "open" ? `\n\nOpen escalation issue: #${escalation.issue} ${escalation.url}` : "";
 		return { systemPrompt: [...event.systemPrompt, rules + issueLine] };
@@ -306,15 +306,15 @@ export default async function teamMode(pi: ExtensionAPI) {
 
 	pi.on("after_provider_response", async (_event, ctx) => {
 		const model = ctx.model;
-		if (isTaskAgent(ctx, "developer") && model) runtimeModel = `${model.provider}/${model.id}`;
+		if (isTaskAgent(ctx, "nesti-developer") && model) runtimeModel = `${model.provider}/${model.id}`;
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
 		const input = (event.input ?? {}) as Input;
-		if (isTaskAgent(ctx, "advisor")) {
+		if (isTaskAgent(ctx, "nesti-advisor")) {
 			const reason = advisorBlock(event.toolName, input);
 			if (reason) return { block: true, reason };
-		} else if (isTaskAgent(ctx, "developer")) {
+		} else if (isTaskAgent(ctx, "nesti-developer")) {
 			const reason = developerBlock(event.toolName, input);
 			if (reason) return { block: true, reason };
 			if (event.toolName === "bash" && typeof input.command === "string") {
@@ -333,7 +333,7 @@ export default async function teamMode(pi: ExtensionAPI) {
 		if (ctx.agent.kind !== "main" || !effective(session, def).enabled) return;
 		const { agent } = event;
 		const name = typeof agent === "string" ? agent : agent && typeof agent === "object" && "name" in agent ? agent.name : undefined;
-		if (name === "advisor" && escalation?.status !== "open") return { block: true, reason: ADVISOR_TOO_EARLY };
+		if (name === "nesti-advisor" && escalation?.status !== "open") return { block: true, reason: ADVISOR_TOO_EARLY };
 	});
 
 	pi.on("tool_result", async (event, ctx) => {

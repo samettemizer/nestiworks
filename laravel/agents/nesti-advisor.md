@@ -1,5 +1,5 @@
 ---
-name: advisor
+name: nesti-advisor
 description: "Advises the Developer on the final attempt after two rejected reviews, using Nesti's project layout, skills, vector memory and issue history. Read-only. Never reviews, never decides, never talks to the Reviewer or the user."
 tools: read, grep, glob, write
 structured: true

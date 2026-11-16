@@ -2,9 +2,9 @@
 
 An [omp](https://omp.sh) plugin that adds an opt-in **CTO team mode** for Laravel projects.
 
-When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `developer` subagent, approves the developer's plan, sends the result to a `reviewer` subagent and relays `MUST_FIX` items. When the review approves in round 1 or 2, the developer commits the change as [Conventional Commits](https://www.conventionalcommits.org/) checked by [commitizen](https://commitizen-tools.github.io/commitizen/); nothing is pushed. After the second rejection it opens an unlabelled GitLab issue through Nesti MCP, spawns the `advisor` and gives the developer one final attempt, which is never committed: approved → the issue is closed with `omp-developer / model: <model>` and the change stays uncommitted in your working tree; rejected → the issue gets the `nesti` label and Nesti's pipeline takes over. It prints a status line at every phase change (`▶ [n/6 Phase] ...`) in your language.
+When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `nesti-developer` subagent, approves the developer's plan, sends the result to a `nesti-reviewer` subagent and relays `MUST_FIX` items. Analysis or plan-only requests stop after the plan. When the review approves in round 1 or 2, the developer commits the change as [Conventional Commits](https://www.conventionalcommits.org/) checked by [commitizen](https://commitizen-tools.github.io/commitizen/); nothing is pushed unless you ask. A review that cannot run a required check returns `blocked`: the CTO resolves it or asks you, and it never counts as a rejection. After the second rejection it opens an unlabelled GitLab issue through Nesti MCP, spawns the `nesti-advisor` and gives the developer one final attempt, which is never committed: approved → the issue is closed with `omp-developer / model: <model>` and the change stays uncommitted in your working tree; rejected → the issue gets the `nesti` label and Nesti's pipeline takes over. It prints a status line at every phase change (`▶ [n/6 Phase] ...`) in your language.
 
-Turning the mode off stops CTO prompt injection, not agent overrides.
+Turning the mode off stops CTO prompt injection; the plugin's agents stay registered.
 
 ## Laravel focus
 
@@ -16,9 +16,9 @@ The roles work from the target project's installed Laravel/PHP versions, layout 
 | --- | --- |
 | `src/cto.ts` | Extension: the `/cto` command, state handling, system-prompt injection |
 | `prompts/cto.md` | CTO rules appended to the system prompt while the mode is on |
-| `agents/developer.md` | `developer` subagent: plans, waits for `APPROVED`, implements, fixes `MUST_FIX` items, commits after `COMMIT` |
-| `agents/reviewer.md` | `reviewer` subagent: read-only review against the acceptance criteria, runs tests |
-| `agents/advisor.md` | `advisor` subagent: read-only root-cause advice for the final attempt from the code first, then Nesti's layout, skills, memory and issue history |
+| `agents/nesti-developer.md` | `nesti-developer` subagent: plans, waits for `APPROVED`, implements, fixes `MUST_FIX` items, commits after `COMMIT` |
+| `agents/nesti-reviewer.md` | `nesti-reviewer` subagent: read-only review against the acceptance criteria and approved plan, runs tests; `blocked` when a required check cannot run |
+| `agents/nesti-advisor.md` | `nesti-advisor` subagent: read-only root-cause advice for the final attempt from the code first, then Nesti's layout, skills, memory and issue history |
 | `.mcp.json` | Nesti MCP server (`nesti mcp`, stdio) |
 
 
@@ -64,7 +64,7 @@ The effective state is resolved in this order:
 
 The profile default is read when a session opens (start, `/new`, resume). Changing it does not affect sessions that are already open.
 
-CTO rules are injected only into the main session. Subagents never get them. The plugin also guards the team: the `advisor` can be spawned only while an escalation issue is open, may call only allowlisted Nesti read tools and message only `agent://Developer`; the `developer` may message only `agent://Advisor`, and its `done` result gets the runtime `model`.
+CTO rules are injected only into the main session. Subagents never get them. The plugin also guards the team by agent name: `nesti-advisor` can be spawned only while an escalation issue is open, may call only allowlisted Nesti read tools and message only `agent://Developer`; `nesti-developer` may message only `agent://Advisor`, and its `done` result gets the runtime `model`.
 
 ## Commits
 
@@ -77,11 +77,15 @@ The developer commits only after the CTO's `COMMIT`, one logical change per comm
 
 The guard only sees the bash tool: git run from another tool (for example Python) is covered by the developer's rules alone.
 
+The developer confirms `cz` is on `PATH` while planning, so a missing commitizen surfaces before implementation. After each commit it checks that the commit holds only that commit's paths and leaves them clean; a hook-modified file blocks delivery and goes back through review.
+
 ## Agent overrides and collisions
 
-This plugin ships agents named `developer`, `reviewer` and `advisor`. They override omp's bundled agents with those names, including the built-in `reviewer`, even while CTO mode is off. Project `.omp/agents/` and user `<agent dir>/agents/` definitions take precedence over plugin agents.
+This plugin ships agents named `nesti-developer`, `nesti-reviewer` and `nesti-advisor`. None of them shadows an omp bundled agent, so the bundled `reviewer` stays available in normal mode, and `nesti-advisor` no longer shares a name with omp's native advisor. The agents stay registered while CTO mode is off; `/cto off` only stops prompt injection. Project `.omp/agents/` and user `<agent dir>/agents/` definitions with the same names take precedence over plugin agents. The CTO never substitutes another agent for a missing one: the plugin's guards apply only to these names.
 
-**Use one nestiworks team-mode package per project.** All variants register `/cto` and the same agent names. Separate state filenames do not prevent command conflicts or mixed agent selection when multiple variants load; do not rely on load order. Disable/uninstall the other variant and restart when switching.
+Upgrading from 1.3.x: the agents were previously named `developer`, `reviewer` and `advisor`. Settings keyed by agent name do not follow the rename; move them yourself, e.g. `task.agentModelOverrides: { nesti-developer: "@task", nesti-reviewer: "@slow", nesti-advisor: "@advisor" }`. The plugin never writes omp settings, and bundled agents do not need to be disabled.
+
+**Use one nestiworks team-mode package per project.** All variants register `/cto`. Separate state filenames do not prevent command conflicts or mixed agent selection when multiple variants load; do not rely on load order. Disable/uninstall the other variant and restart when switching.
 
 ## References
 

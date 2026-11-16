@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
+import teamMode, {
 	advisorBlock,
 	commitBlock,
 	czCheck,
@@ -160,4 +160,32 @@ test.skipIf(!Bun.which("cz"))("czCheck enforces Conventional Commits and the sub
 	expect(czCheck("Revert stuff", tmpdir())).toContain("commit validation: failed");
 	expect(czCheck("fixup! feat(members): add export", tmpdir())).toContain("commit validation: failed");
 	expect(czCheck(`feat(members): ${"x".repeat(80)}`, tmpdir())).toContain("length limit");
+});
+
+test("guards and model capture are wired to the nesti-* agent names", async () => {
+	type Handler = (event: unknown, ctx: unknown) => Promise<any>;
+	const handlers = new Map<string, Handler>();
+	let command: ((args: string, ctx: unknown) => Promise<void>) | undefined;
+	const pi = {
+		on: (name: string, fn: Handler) => handlers.set(name, fn),
+		registerCommand: (_name: string, spec: { handler: typeof command }) => (command = spec.handler),
+		appendEntry: () => {},
+		pi: { getAgentDir: () => tmpdir() },
+	};
+	await teamMode(pi as never);
+	await command?.("on", { ui: { notify: () => {} } });
+	const sub = (name: string, extra = {}) => ({ agent: { kind: "sub", name, depth: 1 }, cwd: tmpdir(), ...extra });
+
+	await handlers.get("after_provider_response")?.({}, sub("nesti-developer", { model: { provider: "p", id: "m" } }));
+	const done = await handlers.get("tool_call")?.({ toolName: "yield", input: { data: { status: "done", summary: "s" } } }, sub("nesti-developer"));
+	expect(done?.input?.data?.model).toBe("p/m");
+
+	const sweep = await handlers.get("tool_call")?.({ toolName: "bash", input: { command: "git add -A" } }, sub("nesti-developer"));
+	expect(sweep?.block).toBe(true);
+
+	const advisorBash = await handlers.get("tool_call")?.({ toolName: "bash", input: { command: "ls" } }, sub("nesti-advisor"));
+	expect(advisorBash?.block).toBe(true);
+
+	const spawn = await handlers.get("before_subagent_spawn")?.({ agent: "nesti-advisor" }, { agent: { kind: "main" } });
+	expect(spawn?.block).toBe(true);
 });
