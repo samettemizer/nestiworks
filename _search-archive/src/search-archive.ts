@@ -125,14 +125,33 @@ export function messageUnits(entry: { timestamp?: unknown; message?: unknown }, 
 		add(REPLY, blockText(m.content, "text", "text"));
 		if (mode === "full" && Array.isArray(m.content)) {
 			for (const b of m.content) {
-				if (b?.type === "toolCall") add(`Araç çağrısı (${b.name})`, [b.name, ...values(b.arguments)].join("\n"));
+				if (b?.type !== "toolCall") continue;
+				const name = typeof b.name === "string" && b.name ? b.name : undefined;
+				add(toolLabel("Araç çağrısı", name), [...(name ? [name] : []), ...values(b.arguments)].join("\n"));
 			}
 		}
 	} else if (m.role === "toolResult" && mode === "full") {
-		add(`Araç çıktısı (${m.toolName})`, blockText(m.content, "text", "text"));
+		const name = typeof m.toolName === "string" && m.toolName ? m.toolName : undefined;
+		add(toolLabel("Araç çıktısı", name), blockText(m.content, "text", "text"));
 	}
 	return units;
 }
+
+function toolLabel(kind: string, name: string | undefined): string {
+	return name ? `${kind} (${name})` : kind;
+}
+
+const JSON_STRING = String.raw`"(?:[^"\\]|\\.)*"`;
+const FLAT = String.raw`(?:${JSON_STRING}|[^"{}[\]])`;
+/**
+ * A tool result entry: a top-level `message` key whose object starts with `"role":"toolResult"`.
+ * Strings are consumed whole and only flat objects (`runtime`) may precede `message`, so braces or
+ * quotes inside strings and nested objects (tool-call arguments) cannot fake it; a line it does not
+ * recognize is simply parsed.
+ */
+export const TOOL_RESULT_LINE = new RegExp(
+	String.raw`^\{(?:${FLAT}|\{${FLAT}*\})*?"message":\{"role":"toolResult"`,
+);
 
 function parse(line: string): Record<string, unknown> | undefined {
 	try {
@@ -186,17 +205,17 @@ export async function scanSession(
 				if (!accept(header)) return undefined;
 				continue;
 			}
-			if (line.includes('"type":"title_change"')) {
-				const e = parse(line);
-				if (e?.type === "title_change" && typeof e.title === "string") changedTitle = e.title;
-				continue;
-			}
-			// Cheap prefilters: only message lines; tool results (the bulk of a file) only for full search.
-			if (!line.includes('"type":"message"')) continue;
-			if (mode === "archive" && line.includes('"role":"toolResult"')) continue;
+			// Cheap prefilter: every message / title_change line contains its top-level `type` verbatim.
+			// Nested content can add false positives, so the parsed `type` decides.
+			if (!line.includes('"type":"message"') && !line.includes('"type":"title_change"')) continue;
+			// Tool results (the bulk of a file) are only searched by full search.
+			if (mode === "archive" && TOOL_RESULT_LINE.test(line)) continue;
 			const e = parse(line);
-			if (e?.type !== "message") continue;
-			for (const unit of messageUnits(e, mode)) if (matcher.test(unit.text)) hits.push(unit);
+			if (e?.type === "title_change") {
+				if (typeof e.title === "string") changedTitle = e.title;
+			} else if (e?.type === "message") {
+				for (const unit of messageUnits(e, mode)) if (matcher.test(unit.text)) hits.push(unit);
+			}
 		}
 	} finally {
 		lines.close();
@@ -205,14 +224,14 @@ export async function scanSession(
 	if (!header) return undefined;
 	const title = slotTitle ?? changedTitle ?? (typeof header.title === "string" ? header.title : "");
 	const base = { session: header.id.slice(0, 13), project: tilde(String(header.cwd ?? "")), title };
-	const rows: Row[] = [];
+	const rows: Row[] = hits.map(h => ({ ...base, at: h.at, location: h.location, note: matcher.snippet(h.text) }));
 	if (title && matcher.test(title)) {
 		rows.push({ ...base, at: Date.parse(String(header.timestamp)), location: TITLE, note: matcher.snippet(title) });
 	}
-	// File order is chronological; reverse, then a stable sort keeps newest first even across branches.
-	hits.reverse().sort((a, b) => (b.at || 0) - (a.at || 0));
-	for (const h of hits) rows.push({ ...base, at: h.at, location: h.location, note: matcher.snippet(h.text) });
-	return rows;
+	// Newest first; rows without a date last. File order is chronological, so reversing first keeps
+	// later-written rows ahead on equal dates (stable sort).
+	const key = (r: Row) => (Number.isFinite(r.at) ? r.at : Number.NEGATIVE_INFINITY);
+	return rows.reverse().sort((a, b) => (key(a) === key(b) ? 0 : key(b) > key(a) ? 1 : -1));
 }
 
 /** Top-level `<root>/<project>/*.jsonl` files, most recently modified first. */
@@ -249,7 +268,7 @@ export interface SearchOptions {
 	limit: number;
 }
 
-/** Rows grouped by session (newest first); stops once `limit` rows are collected. */
+/** Rows grouped by session (newest first); stops once a row beyond `limit` proves there are more. */
 export async function search(o: SearchOptions): Promise<{ rows: Row[]; limited: boolean }> {
 	const cwd = resolve(o.cwd);
 	const accept = (h: SessionHeader) =>
@@ -257,9 +276,9 @@ export async function search(o: SearchOptions): Promise<{ rows: Row[]; limited: 
 	const rows: Row[] = [];
 	for (const file of await listSessionFiles(o.root)) {
 		rows.push(...((await scanSession(file, o.matcher, o.mode, accept)) ?? []));
-		if (rows.length >= o.limit) return { rows: rows.slice(0, o.limit), limited: true };
+		if (rows.length > o.limit) break;
 	}
-	return { rows, limited: false };
+	return { rows: rows.slice(0, o.limit), limited: rows.length > o.limit };
 }
 
 export function parseArgs(args: string): { query: string; all: boolean; limit: number } | undefined {
@@ -279,9 +298,15 @@ export function parseArgs(args: string): { query: string; all: boolean; limit: n
 	return query.length > 0 ? { query: query.join(" "), all, limit } : undefined;
 }
 
-/** One-line markdown table cell. */
+/**
+ * One-line markdown table cell that renders as the literal text. ASCII punctuation is backslash-escaped,
+ * so a `|` always has an odd run of backslashes before it (cell-safe for omp's parser, cmark-gfm and
+ * marked) and no emphasis, code span, HTML or `$` math can form; `]` escaped blocks links. `(`, `)` and
+ * `[` stay bare: omp's inline math extension runs before escapes and reads `\(` / `\[` as math openers.
+ * A source backslash before them becomes `\\`, which the escape rule consumes first.
+ */
 export function cell(text: string): string {
-	return text.replace(/\s+/g, " ").trim().replace(/\|/g, "\\|");
+	return text.replace(/\s+/g, " ").trim().replace(/[!-'*-/:-@\\-`{-~]/g, "\\$&");
 }
 
 export function formatDate(at: number): string {
@@ -294,7 +319,7 @@ export function renderTable(rows: Row[], mode: Mode): string {
 	const head = ["Oturum", "Proje", "Başlık", "Tarih (UTC)", ...(full ? ["Konum"] : []), "Not"];
 	return [
 		line(head),
-		line(head.map(() => "---")),
+		`|${head.map(() => " --- ").join("|")}|`,
 		...rows.map(r =>
 			line([r.session, r.project, r.title, formatDate(r.at), ...(full ? [r.location] : []), r.note]),
 		),
@@ -318,7 +343,7 @@ export default function searchArchive(pi: ExtensionAPI) {
 			mode,
 			limit: parsed.limit,
 		});
-		const scope = `kapsam: ${parsed.all ? "tüm projeler" : `bu proje (${tilde(ctx.cwd)})`}`;
+		const scope = `kapsam: ${parsed.all ? "tüm projeler" : `bu proje (${cell(tilde(ctx.cwd))})`}`;
 		const query = `**"${cell(parsed.query)}"**`;
 		const lines = rows.length
 			? [`${query} için ${rows.length} sonuç · ${scope}`, "", renderTable(rows, mode)]

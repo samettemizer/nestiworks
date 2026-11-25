@@ -23,8 +23,8 @@ For local development, load the working copy for one run with `omp -e ./_search-
 | `/search-full <query> [--all] [--limit N]` | Everything above plus model thinking, tool calls (tool name and argument values) and tool output |
 
 - **Scope:** sessions of the current project (same working directory) by default; `--all` searches every project. The session you are in is always excluded.
-- **Limit:** at most `N` rows (default 50). When the limit is reached a note says so.
-- **Order:** sessions newest first (by last write), then matches inside a session newest first.
+- **Limit:** at most `N` rows (default 50). A note appears only when more matches exist beyond the limit.
+- **Order:** sessions newest first (by last write), then rows inside a session newest first by date; a title match is dated at the session start.
 
 Results appear as a table in the transcript (shown to you, not sent to the model):
 

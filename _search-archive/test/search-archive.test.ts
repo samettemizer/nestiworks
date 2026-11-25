@@ -7,6 +7,7 @@ import searchArchive, {
 	compileQuery,
 	formatDate,
 	type Matcher,
+	messageUnits,
 	parseArgs,
 	REPLY,
 	renderTable,
@@ -16,6 +17,7 @@ import searchArchive, {
 	THINKING,
 	TITLE,
 	tilde,
+	TOOL_RESULT_LINE,
 	USER,
 } from "../src/search-archive";
 
@@ -106,7 +108,7 @@ test("full mode labels thinking, tool calls and tool output", async () => {
 	expect(await scanSession(FIXTURE, matcher("permission denied"), "archive", () => true)).toEqual([]);
 });
 
-test("title hits come first; the title slot wins over title_change", async () => {
+test("title hit row: slot title wins over title_change; dated at session start", async () => {
 	const rows = await scanSession(FIXTURE, matcher("setup"), "full", () => true);
 	expect(rows).toEqual([
 		{
@@ -119,6 +121,111 @@ test("title hits come first; the title slot wins over title_change", async () =>
 		},
 	]);
 	expect(await scanSession(FIXTURE, matcher("setup"), "full", () => false)).toBeUndefined();
+});
+
+test("rows inside a session are strictly newest first, title row included", async () => {
+	const rows = await scanSession(FIXTURE, matcher("logging"), "archive", () => true);
+	expect(rows?.map(r => [r.location, r.at])).toEqual([
+		[REPLY, Date.parse("2026-11-20T10:01:00Z")],
+		[USER, Date.parse("2026-11-20T10:00:00Z")],
+		[TITLE, Date.parse("2026-11-20T09:59:00Z")],
+	]);
+	const dir = await mkdtemp(join(tmpdir(), "search-archive-"));
+	try {
+		// A title newer than some messages sorts between them; an undated row goes last.
+		const file = join(dir, "s.jsonl");
+		const undated = assistant("bogus", "needle undated");
+		await writeFile(
+			file,
+			[
+				{ type: "session", id: "01bbbbbb-0001", timestamp: "2026-11-20T10:00:30Z", cwd: "/p", title: "needle title" },
+				assistant("2026-11-20T10:01:00Z", "needle late"),
+				{ ...undated, message: { ...undated.message, timestamp: undefined } },
+				assistant("2026-11-20T10:00:00Z", "needle early"),
+			]
+				.map(e => JSON.stringify(e))
+				.join("\n"),
+		);
+		const mixed = await scanSession(file, matcher("needle"), "archive", () => true);
+		expect(mixed?.map(r => r.note)).toEqual(["needle late", "needle title", "needle early", "needle undated"]);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+function assistant(at: string, text: string, extra: object[] = []) {
+	return {
+		type: "message",
+		id: "m",
+		parentId: null,
+		timestamp: at,
+		message: { role: "assistant", content: [{ type: "text", text }, ...extra], timestamp: Date.parse(at) },
+	};
+}
+
+test("title_change and toolResult are decided by the parsed entry, not nested look-alikes", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "search-archive-"));
+	try {
+		const file = join(dir, "s.jsonl");
+		const lookAlike = {
+			type: "toolCall",
+			id: "t",
+			name: "eval",
+			arguments: { type: "title_change", title: "fake", message: { role: "toolResult" } },
+		};
+		await writeFile(
+			file,
+			[
+				{ type: "session", id: "01bbbbbb-0002", timestamp: "2026-11-20T10:00:00Z", cwd: "/p" },
+				{ type: "title_change", id: "c", parentId: null, timestamp: "2026-11-20T10:00:01Z", title: "Real title" },
+				assistant("2026-11-20T10:01:00Z", "needle in the reply", [lookAlike]),
+				{
+					type: "message",
+					id: "r",
+					parentId: "m",
+					timestamp: "2026-11-20T10:02:00Z",
+					message: { role: "toolResult", toolCallId: "t", toolName: "eval", content: [{ type: "text", text: "needle out" }] },
+				},
+			]
+				.map(e => JSON.stringify(e))
+				.join("\n"),
+		);
+		const archive = await scanSession(file, matcher("needle"), "archive", () => true);
+		expect(archive?.map(r => [r.location, r.title])).toEqual([[REPLY, "Real title"]]);
+		const full = await scanSession(file, matcher("title change"), "full", () => true);
+		expect(full?.map(r => r.location)).toEqual(["Araç çağrısı (eval)"]);
+		expect((await scanSession(file, matcher("needle"), "full", () => true))?.map(r => r.location)).toEqual([
+			"Araç çıktısı (eval)",
+			REPLY,
+		]);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("toolResult prefilter matches only top-level tool results", () => {
+	const entry = (message: object, extra: object = {}) =>
+		JSON.stringify({ type: "message", id: "a", parentId: null, timestamp: "t", runtime: { version: "19.2.1" }, ...extra, message });
+	expect(TOOL_RESULT_LINE.test(entry({ role: "toolResult", toolName: "bash", content: [] }))).toBe(true);
+	expect(TOOL_RESULT_LINE.test(entry({ role: "toolResult" }, { runtime: undefined }))).toBe(true);
+	const lookAlikes = [
+		entry({ role: "assistant", content: [{ type: "toolCall", arguments: { message: { role: "toolResult" } } }] }),
+		entry({ role: "user", content: 'a }","message":{"role":"toolResult"' }),
+		entry({ role: "user", content: "x" }, { id: '"message":{"role":"toolResult"' }),
+		entry({ role: "user", content: "}", message: { role: "toolResult" } }),
+	];
+	for (const line of lookAlikes) expect([line, TOOL_RESULT_LINE.test(line)]).toEqual([line, false]);
+});
+
+test("tools without a name get labels without parentheses", () => {
+	const at = "2026-11-20T10:00:00Z";
+	const call = messageUnits(assistant(at, "", [{ type: "toolCall", id: "t", arguments: { command: "needle" } }]), "full");
+	expect(call).toEqual([{ location: "Araç çağrısı", text: "needle", at: Date.parse(at) }]);
+	const result = messageUnits(
+		{ timestamp: at, message: { role: "toolResult", toolName: "", content: [{ type: "text", text: "needle" }] } },
+		"full",
+	);
+	expect(result).toEqual([{ location: "Araç çıktısı", text: "needle", at: Date.parse(at) }]);
 });
 
 function session(id: string, cwd: string, text: string, at: string): string {
@@ -167,11 +274,15 @@ test("scope: current project by default, --all widens, current session excluded,
 		const own = await search({ ...base, all: false, matcher: m, limit: 50 });
 		expect(own.rows.map(r => r.session)).toEqual(["01dddddd-0003", "01aaaaaa-0001", "01aaaaaa-0001"]);
 		expect(own.limited).toBe(false);
+		// Exactly `limit` matches: nothing more exists, so no limit note.
+		expect(await search({ ...base, all: false, matcher: m, limit: 3 })).toMatchObject({ limited: false });
 		const all = await search({ ...base, all: true, matcher: m, limit: 50 });
 		expect(all.rows.map(r => r.session)).toEqual(["01dddddd-0003", "01eeeeee-0004", "01aaaaaa-0001", "01aaaaaa-0001"]);
 		const limited = await search({ ...base, all: true, matcher: m, limit: 2 });
 		expect(limited).toMatchObject({ limited: true });
 		expect(limited.rows.map(r => r.session)).toEqual(["01dddddd-0003", "01eeeeee-0004"]);
+		expect(await search({ ...base, all: true, matcher: m, limit: 3 })).toMatchObject({ limited: true });
+		expect(await search({ ...base, all: true, matcher: m, limit: 4 })).toMatchObject({ limited: false });
 		const missing = await search({ ...base, root: join(agentDir, "nope"), all: true, matcher: m, limit: 50 });
 		expect(missing.rows).toEqual([]);
 	} finally {
@@ -188,26 +299,124 @@ const row: Row = {
 	note: "x|y\nz",
 };
 
-test("table rendering: headers, column order, cell escaping", () => {
+test("table rendering: headers, column order, literal cell escaping", () => {
 	expect(renderTable([row], "archive")).toBe(
 		[
 			"| Oturum | Proje | Başlık | Tarih (UTC) | Not |",
 			"| --- | --- | --- | --- | --- |",
-			"| 01aaaaaa-0001 | ~/www/x | a \\| b c | 11-20 10:01 | x\\|y z |",
+			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | x\\|y z |",
 		].join("\n"),
 	);
 	expect(renderTable([row], "full")).toBe(
 		[
 			"| Oturum | Proje | Başlık | Tarih (UTC) | Konum | Not |",
 			"| --- | --- | --- | --- | --- | --- |",
-			"| 01aaaaaa-0001 | ~/www/x | a \\| b c | 11-20 10:01 | Araç çıktısı (bash) | x\\|y z |",
+			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | Araç çıktısı (bash) | x\\|y z |",
 		].join("\n"),
 	);
 	expect(cell("  a\r\n\tb | c  ")).toBe("a b \\| c");
+	expect(cell("a|b")).toBe("a\\|b");
+	expect(cell("a\\|b")).toBe("a\\\\\\|b");
+	expect(cell("a\\\\|b")).toBe("a\\\\\\\\\\|b");
+	expect(cell("end\\")).toBe("end\\\\");
+	expect(cell("`x|y` *z*")).toBe("\\`x\\|y\\` \\*z\\*");
+	expect(cell("\\(x) [a](b) $5")).toBe("\\\\(x) [a\\](b) \\$5");
 	expect(formatDate(Number.NaN)).toBe("");
 	expect(tilde(join(homedir(), "www", "x"))).toBe("~/www/x");
 	expect(tilde(homedir())).toBe("~");
 	expect(tilde("/srv/x")).toBe("/srv/x");
+});
+
+/**
+ * Reference cell decoders. omp 19.2.0 (`Wt` in its markdown lexer) and cmark-gfm end a cell at a `|`
+ * whose previous character is not `\`; marked ends it at a `|` preceded by an even run of backslashes.
+ * All three then turn `\|` into `|` before inline parsing.
+ */
+const pipeRules = {
+	"omp/cmark-gfm": (s: string, i: number) => s[i - 1] === "\\",
+	marked: (s: string, i: number) => {
+		let n = 0;
+		while (s[i - 1 - n] === "\\") n++;
+		return n % 2 === 1;
+	},
+};
+
+/**
+ * Inline pass as omp runs it: its `omp-math` extension is tried before escapes and opens at `$`, `\(`
+ * or `\[` (math-delimiters.ts `Ntt`), so any of those not consumed by a preceding escape fails. Other
+ * bare punctuation that could start markup (emphasis, code, links, HTML, strike) fails too; `(`, `)`,
+ * `[` and the table's own unescaped `|` are inert on their own.
+ */
+function decodeInline(text: string): string {
+	let out = "";
+	for (let i = 0; i < text.length; i++) {
+		const c = text[i];
+		const next = text[i + 1] ?? "";
+		if (c === "$" || (c === "\\" && (next === "(" || next === "["))) {
+			throw new Error(`math opener at ${i} in ${JSON.stringify(text)}`);
+		}
+		if (c === "\\" && /[!-/:-@[-`{-~]/.test(next)) {
+			out += next;
+			i++;
+		} else if (/[!-'*-/:-@\\-`{-~]/.test(c) && c !== "|") {
+			throw new Error(`bare ${c} at ${i} in ${JSON.stringify(text)}`);
+		} else out += c;
+	}
+	return out;
+}
+
+function decodeRow(line: string, escaped: (s: string, i: number) => boolean): string[] {
+	const inner = line.slice(2, -2);
+	const cells: string[] = [];
+	let cur = "";
+	for (let i = 0; i < inner.length; i++) {
+		if (inner[i] === "|" && !escaped(inner, i)) {
+			cells.push(cur.trim());
+			cur = "";
+		} else cur += inner[i];
+	}
+	cells.push(cur.trim());
+	return cells.map(c => decodeInline(c.replace(/\\\|/g, "|")));
+}
+
+test("escaped cells round-trip to the literal text under omp (math included), cmark-gfm and marked", () => {
+	const at = Date.parse("2026-11-20T10:01:00Z");
+	const rows: Row[] = [
+		{
+			session: "a|b",
+			project: "a\\|b",
+			title: "a\\\\|b",
+			at,
+			location: "trailing\\",
+			note: "`code | x` *em* <b>&amp; [l](u) \\",
+		},
+		{
+			session: "(x)",
+			project: "[a](b)",
+			title: "[x]",
+			at,
+			location: "Araç çağrısı (bash)",
+			note: "$5 and $6 \\(m\\) \\[n\\] $$z$$ ~~s~~ ![i](j)",
+		},
+	];
+	const lines = renderTable(rows, "full").split("\n");
+	expect(lines[0]).toContain("| Tarih (UTC) |");
+	expect(lines[3]).toContain("| Araç çağrısı (bash) |");
+	for (const [rule, escaped] of Object.entries(pipeRules)) {
+		expect([rule, decodeRow(lines[0], escaped)]).toEqual([
+			rule,
+			["Oturum", "Proje", "Başlık", "Tarih (UTC)", "Konum", "Not"],
+		]);
+		rows.forEach((r, i) => {
+			expect([rule, decodeRow(lines[2 + i], escaped)]).toEqual([
+				rule,
+				[r.session, r.project, r.title, "11-20 10:01", r.location, r.note],
+			]);
+		});
+	}
+	// The rule rejects what the previous escaping produced: an escaped paren or a bare `$` opens math.
+	expect(() => decodeInline("Tarih \\(UTC\\)")).toThrow("math opener");
+	expect(() => decodeInline("$5")).toThrow("math opener");
 });
 
 test("argument parsing", () => {
@@ -254,8 +463,9 @@ test("commands: table message, resume prefill only with editor support", async (
 		await commands.get("search-archive")?.("gcloud logging", tui);
 		expect(sent[0]).toMatchObject({ customType: "search-archive", display: true, excludeFromContext: true });
 		expect(sent[0].content).toContain("| Oturum | Proje | Başlık | Tarih (UTC) | Not |");
-		expect(sent[0].content).toContain("3 sonuç · kapsam: bu proje (/proj/a)");
+		expect(sent[0].content).toContain("3 sonuç · kapsam: bu proje (\\/proj\\/a)");
 		expect(sent[0].content).not.toContain("current");
+		expect(sent[0].content).not.toContain("İlk");
 		expect(tui.editor).toEqual(["/resume 01dddddd-0003"]);
 
 		const headless = ctx(undefined);
@@ -273,6 +483,11 @@ test("commands: table message, resume prefill only with editor support", async (
 		await commands.get("search-archive")?.("--all", none);
 		expect(none.notes[0]).toContain("Kullanım: /search-archive");
 		expect(sent).toHaveLength(3);
+
+		await commands.get("search-archive")?.("gcloud logging --limit 3", none);
+		expect(sent[3].content).not.toContain("İlk");
+		await commands.get("search-archive")?.("gcloud logging --limit 2", none);
+		expect(sent[4].content).toContain("İlk 2 sonuç gösteriliyor");
 	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}
