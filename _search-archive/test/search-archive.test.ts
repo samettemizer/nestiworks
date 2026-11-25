@@ -5,12 +5,14 @@ import { join } from "node:path";
 import searchArchive, {
 	cell,
 	compileQuery,
+	flat,
 	formatDate,
+	type Item,
+	layout,
 	type Matcher,
 	messageUnits,
 	parseArgs,
 	REPLY,
-	renderTable,
 	type Row,
 	scanSession,
 	search,
@@ -112,6 +114,8 @@ test("title hit row: slot title wins over title_change; dated at session start",
 	const rows = await scanSession(FIXTURE, matcher("setup"), "full", () => true);
 	expect(rows).toEqual([
 		{
+			file: FIXTURE,
+			cwd: "/proj/a",
 			session: "01aaaaaa-0001",
 			project: "/proj/a",
 			title: "Logging | setup",
@@ -291,6 +295,8 @@ test("scope: current project by default, --all widens, current session excluded,
 });
 
 const row: Row = {
+	file: "/s/x.jsonl",
+	cwd: "/home/u/www/x",
 	session: "01aaaaaa-0001",
 	project: "~/www/x",
 	title: "a | b\nc",
@@ -299,25 +305,34 @@ const row: Row = {
 	note: "x|y\nz",
 };
 
-test("table rendering: headers, column order, literal cell escaping", () => {
-	expect(renderTable([row], "archive")).toBe(
-		[
-			"| Session | Project | Title | Date (UTC) | Note |",
-			"| --- | --- | --- | --- | --- |",
-			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | x\\|y z |",
-		].join("\n"),
-	);
-	expect(renderTable([row], "full")).toBe(
-		[
-			"| Session | Project | Title | Date (UTC) | Location | Note |",
-			"| --- | --- | --- | --- | --- | --- |",
-			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | Tool output (bash) | x\\|y z |",
-		].join("\n"),
-	);
+test("layout: header, column order, padding, literal escaping", () => {
+	expect(layout([row], "archive", cell)).toEqual({
+		head: "   Session        Project  Title    Date (UTC)  · Note below",
+		items: [{ label: "1. 01aaaaaa\\-0001  \\~\\/www\\/x  a \\| b c  11\\-20 10\\:01", description: "x\\|y z" }],
+	});
+	expect(layout([row], "full", cell)).toEqual({
+		head: "   Session        Project  Title    Date (UTC)   Location  · Note below",
+		items: [
+			{
+				label: "1. 01aaaaaa\\-0001  \\~\\/www\\/x  a \\| b c  11\\-20 10\\:01  Tool output (bash)",
+				description: "x\\|y z",
+			},
+		],
+	});
+	expect(layout([row], "archive", flat).items).toEqual([
+		{ label: "1. 01aaaaaa-0001  ~/www/x  a | b c  11-20 10:01", description: "x|y z" },
+	]);
+	// Ten rows: numbers padded after the dot (`1. ` keeps digit quick-pick); padding capped at 40 columns.
+	const rows = Array.from({ length: 10 }, (_, i) => ({ ...row, title: i === 9 ? "t".repeat(60) : "short" }));
+	const { head, items } = layout(rows, "archive", flat);
+	expect(items[0].label).toStartWith("1.  01aaaaaa-0001");
+	expect(items[9].label).toStartWith("10. 01aaaaaa-0001");
+	expect(items[0].label).toBe(`1.  01aaaaaa-0001  ~/www/x  short${" ".repeat(35)}  11-20 10:01`);
+	expect(items[9].label).toBe(`10. 01aaaaaa-0001  ~/www/x  ${"t".repeat(60)}  11-20 10:01`);
+	expect(head.indexOf("Date")).toBe(items[0].label.indexOf("11-20"));
+	expect(flat("  a\r\n\tb | c  ")).toBe("a b | c");
 	expect(cell("  a\r\n\tb | c  ")).toBe("a b \\| c");
-	expect(cell("a|b")).toBe("a\\|b");
 	expect(cell("a\\|b")).toBe("a\\\\\\|b");
-	expect(cell("a\\\\|b")).toBe("a\\\\\\\\\\|b");
 	expect(cell("end\\")).toBe("end\\\\");
 	expect(cell("`x|y` *z*")).toBe("\\`x\\|y\\` \\*z\\*");
 	expect(cell("\\(x) [a](b) $5")).toBe("\\\\(x) [a\\](b) \\$5");
@@ -328,24 +343,10 @@ test("table rendering: headers, column order, literal cell escaping", () => {
 });
 
 /**
- * Reference cell decoders. omp 19.2.0 (`Wt` in its markdown lexer) and cmark-gfm end a cell at a `|`
- * whose previous character is not `\`; marked ends it at a `|` preceded by an even run of backslashes.
- * All three then turn `\|` into `|` before inline parsing.
- */
-const pipeRules = {
-	"omp/cmark-gfm": (s: string, i: number) => s[i - 1] === "\\",
-	marked: (s: string, i: number) => {
-		let n = 0;
-		while (s[i - 1 - n] === "\\") n++;
-		return n % 2 === 1;
-	},
-};
-
-/**
- * Inline pass as omp runs it: its `omp-math` extension is tried before escapes and opens at `$`, `\(`
- * or `\[` (math-delimiters.ts `Ntt`), so any of those not consumed by a preceding escape fails. Other
- * bare punctuation that could start markup (emphasis, code, links, HTML, strike) fails too; `(`, `)`,
- * `[` and the table's own unescaped `|` are inert on their own.
+ * Inline pass as omp runs it on picker labels and notes (`plainInlineMarkdown`): its `omp-math`
+ * extension is tried before escapes and opens at `$`, `\(` or `\[` (math-delimiters.ts `Ntt`), so any
+ * of those not consumed by a preceding escape fails. Other bare punctuation that could start markup
+ * (emphasis, code, links, HTML, strike) fails too; `(`, `)` and `[` are inert on their own.
  */
 function decodeInline(text: string): string {
 	let out = "";
@@ -358,62 +359,29 @@ function decodeInline(text: string): string {
 		if (c === "\\" && /[!-/:-@[-`{-~]/.test(next)) {
 			out += next;
 			i++;
-		} else if (/[!-'*-/:-@\\-`{-~]/.test(c) && c !== "|") {
+		} else if (/[!-'*-/:-@\\-`{-~]/.test(c)) {
 			throw new Error(`bare ${c} at ${i} in ${JSON.stringify(text)}`);
 		} else out += c;
 	}
 	return out;
 }
 
-function decodeRow(line: string, escaped: (s: string, i: number) => boolean): string[] {
-	const inner = line.slice(2, -2);
-	const cells: string[] = [];
-	let cur = "";
-	for (let i = 0; i < inner.length; i++) {
-		if (inner[i] === "|" && !escaped(inner, i)) {
-			cells.push(cur.trim());
-			cur = "";
-		} else cur += inner[i];
-	}
-	cells.push(cur.trim());
-	return cells.map(c => decodeInline(c.replace(/\\\|/g, "|")));
-}
-
-test("escaped cells round-trip to the literal text under omp (math included), cmark-gfm and marked", () => {
+test("escaped labels and notes round-trip to the literal text under omp's inline markdown", () => {
 	const at = Date.parse("2026-11-20T10:01:00Z");
+	const base = { file: "/s/x.jsonl", cwd: "/x", at, location: "Tool call (bash)" };
 	const rows: Row[] = [
-		{
-			session: "a|b",
-			project: "a\\|b",
-			title: "a\\\\|b",
-			at,
-			location: "trailing\\",
-			note: "`code | x` *em* <b>&amp; [l](u) \\",
-		},
-		{
-			session: "(x)",
-			project: "[a](b)",
-			title: "[x]",
-			at,
-			location: "Tool call (bash)",
-			note: "$5 and $6 \\(m\\) \\[n\\] $$z$$ ~~s~~ ![i](j)",
-		},
+		{ ...base, session: "a|b", project: "a\\|b", title: "a\\\\|b", note: "`code | x` *em* <b>&amp; [l](u) \\" },
+		{ ...base, session: "(x)", project: "[a](b)", title: "[x]", note: "$5 and $6 \\(m\\) \\[n\\] $$z$$ ~~s~~ ![i](j)" },
+		{ ...base, session: "s", project: "p", title: "trailing\\", location: "x  y", note: "" },
 	];
-	const lines = renderTable(rows, "full").split("\n");
-	expect(lines[0]).toContain("| Date (UTC) |");
-	expect(lines[3]).toContain("| Tool call (bash) |");
-	for (const [rule, escaped] of Object.entries(pipeRules)) {
-		expect([rule, decodeRow(lines[0], escaped)]).toEqual([
-			rule,
-			["Session", "Project", "Title", "Date (UTC)", "Location", "Note"],
-		]);
-		rows.forEach((r, i) => {
-			expect([rule, decodeRow(lines[2 + i], escaped)]).toEqual([
-				rule,
-				[r.session, r.project, r.title, "11-20 10:01", r.location, r.note],
-			]);
-		});
-	}
+	const { items } = layout(rows, "full", cell);
+	rows.forEach((r, i) => {
+		// Columns are separated by two or more spaces; `flat` leaves at most one space inside a value.
+		expect(decodeInline(items[i].label.slice(3)).split(/ {2,}/)).toEqual(
+			[r.session, r.project, r.title, "11-20 10:01", r.location].map(flat),
+		);
+		expect(decodeInline(items[i].description)).toBe(flat(r.note));
+	});
 	// The rule rejects what the previous escaping produced: an escaped paren or a bare `$` opens math.
 	expect(() => decodeInline("Date \\(UTC\\)")).toThrow("math opener");
 	expect(() => decodeInline("$5")).toThrow("math opener");
@@ -430,66 +398,170 @@ test("argument parsing", () => {
 	expect(parseArgs("   ")).toBeUndefined();
 });
 
-test("commands: table message, resume prefill only with editor support", async () => {
+test("commands: picker in the TUI resumes the pick, notification elsewhere, nothing sent or saved", async () => {
 	const agentDir = await sessionsTree();
+	const root = join(agentDir, "sessions");
+	const leaked: unknown[] = [];
 	try {
 		const commands = new Map<string, (args: string, ctx: unknown) => Promise<void>>();
-		const sent: { customType: string; content: string; display: boolean; excludeFromContext: boolean }[] = [];
 		const pi = {
 			pi: { getAgentDir: () => agentDir },
 			registerCommand: (name: string, def: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
 				commands.set(name, def.handler),
-			sendMessage: (m: (typeof sent)[number]) => sent.push(m),
+			sendMessage: (...args: unknown[]) => leaked.push(["sendMessage", args]),
+			sendUserMessage: (...args: unknown[]) => leaked.push(["sendUserMessage", args]),
+			appendEntry: (...args: unknown[]) => leaked.push(["appendEntry", args]),
 		};
 		searchArchive(pi as never);
 		expect([...commands.keys()]).toEqual(["search-archive", "search-full"]);
 
-		const ctx = (supportsEditor?: boolean) => {
+		const ctx = (
+			mode: string,
+			o: {
+				pick?: (labels: string[]) => string | undefined;
+				cancelled?: boolean;
+				supportsEditor?: boolean;
+				typed?: string;
+			} = {},
+		) => {
 			const c = {
+				mode,
 				cwd: "/proj/a",
 				editor: [] as string[],
 				notes: [] as string[],
+				switched: [] as string[],
+				selects: [] as { title: string[]; items: Item[] }[],
+				inputs: [] as string[],
 				sessionManager: { getSessionId: () => CURRENT },
+				switchSession: async (file: string) => {
+					c.switched.push(file);
+					return { cancelled: o.cancelled ?? false };
+				},
 				ui: {
-					supportsEditor,
+					input: async (title: string) => {
+						c.inputs.push(title);
+						return o.typed;
+					},
+					supportsEditor: o.supportsEditor,
+					select: async (title: string, items: Item[]) => {
+						c.selects.push({ title: title.split("\n"), items });
+						return o.pick?.(items.map(i => i.label));
+					},
 					setEditorText: (t: string) => c.editor.push(t),
 					notify: (t: string) => c.notes.push(t),
 				},
 			};
 			return c;
 		};
+		const run = (name: string, args: string, c: ReturnType<typeof ctx>) => commands.get(name)?.(args, c);
+		const sessions = (c: ReturnType<typeof ctx>) => c.selects[0].items.map(i => i.label.split("  ")[0]);
 
-		const tui = ctx(true);
-		await commands.get("search-archive")?.("gcloud logging", tui);
-		expect(sent[0]).toMatchObject({ customType: "search-archive", display: true, excludeFromContext: true });
-		expect(sent[0].content).toContain("| Session | Project | Title | Date (UTC) | Note |");
-		expect(sent[0].content).toContain("3 results for");
-		expect(sent[0].content).toContain("scope: this project (\\/proj\\/a)");
-		expect(sent[0].content).not.toContain("current");
-		expect(sent[0].content).not.toContain("Showing the first");
-		expect(tui.editor).toEqual(["/resume 01dddddd-0003"]);
+		// Picking a same-project row resumes it.
+		const tui = ctx("tui", { pick: labels => labels[0], supportsEditor: true });
+		await run("search-archive", "gcloud logging", tui);
+		expect(tui.selects).toHaveLength(1);
+		expect(tui.selects[0].title).toEqual([
+			'3 results for "gcloud logging" · scope: this project (/proj/a)',
+			"   Session        Project  Title            Date (UTC)  · Note below",
+		]);
+		expect(sessions(tui)).toEqual(["1. 01dddddd\\-0003", "2. 01aaaaaa\\-0001", "3. 01aaaaaa\\-0001"]);
+		expect(tui.selects[0].items[0].description).toBe("Cloud Logging \\+ gcloud");
+		expect(tui.selects[0].items.map(i => i.description).join(" ")).not.toContain("current");
+		expect(tui.switched).toEqual([join(root, "-proj-a", "s3.jsonl")]);
+		expect(tui.editor).toEqual([]);
+		expect(tui.notes).toEqual([]);
 
-		const headless = ctx(undefined);
-		await commands.get("search-full")?.("permission denied --all", headless);
-		expect(sent[1].content).toContain("| Location | Note |");
-		expect(sent[1].content).toContain("Tool output (bash)");
-		expect(sent[1].content).toContain("scope: all projects");
-		expect(headless.editor).toEqual([]);
+		// A vetoed switch falls back to prefilling `/resume` for that row.
+		const vetoed = ctx("tui", { pick: labels => labels[1], cancelled: true });
+		await run("search-archive", "gcloud logging", vetoed);
+		expect(vetoed.switched).toEqual([join(root, "-proj-a", "s1.jsonl")]);
+		expect(vetoed.editor).toEqual(["/resume 01aaaaaa-0001"]);
 
-		const none = ctx(true);
-		await commands.get("search-archive")?.("zzzz-nothing", none);
-		expect(sent[2].content).toContain("No results for");
+		// Another project's row: no switch (omp would reject the cwd change), `/resume` prefilled.
+		const other = ctx("tui", { pick: labels => labels[1] });
+		await run("search-archive", "gcloud logging --all", other);
+		expect(other.selects[0].title[0]).toBe('4 results for "gcloud logging" · scope: all projects');
+		expect(sessions(other)[1]).toBe("2. 01eeeeee\\-0004");
+		expect(other.switched).toEqual([]);
+		expect(other.editor).toEqual(["/resume 01eeeeee-0004"]);
+
+		// Esc: nothing happens.
+		const esc = ctx("tui", { pick: () => undefined, supportsEditor: true });
+		await run("search-full", "permission denied --all", esc);
+		expect(esc.selects[0].title[1]).toContain("  Location  · Note below");
+		expect(esc.selects[0].items.some(i => i.label.endsWith("  Tool output (bash)"))).toBe(true);
+		expect(esc.switched).toEqual([]);
+		expect(esc.editor).toEqual([]);
+
+		const none = ctx("tui", { supportsEditor: true });
+		await run("search-archive", "zzzz-nothing", none);
+		expect(none.notes).toEqual(['No results for "zzzz-nothing" · scope: this project (/proj/a)']);
+		await run("search-archive", "--all", none);
+		expect(none.notes[1]).toContain("Usage: /search-archive");
+		expect(none.selects).toEqual([]);
 		expect(none.editor).toEqual([]);
 
-		await commands.get("search-archive")?.("--all", none);
-		expect(none.notes[0]).toContain("Usage: /search-archive");
-		expect(sent).toHaveLength(3);
+		const limit = ctx("tui");
+		await run("search-archive", "gcloud logging --limit 3", limit);
+		expect(limit.selects[0].title).toHaveLength(2);
+		await run("search-archive", "gcloud logging --limit 2", limit);
+		expect(limit.selects[1].title[1]).toBe("Showing the first 2 results; use --limit N for more.");
 
-		await commands.get("search-archive")?.("gcloud logging --limit 3", none);
-		expect(sent[3].content).not.toContain("Showing the first");
-		await commands.get("search-archive")?.("gcloud logging --limit 2", none);
-		expect(sent[4].content).toContain("Showing the first 2 results");
+		// Outside the TUI: one plain-text notification and the first-hit prefill where a composer exists.
+		const rpc = ctx("rpc", { supportsEditor: true });
+		await run("search-archive", "gcloud logging", rpc);
+		expect(rpc.selects).toEqual([]);
+		expect(rpc.notes).toHaveLength(1);
+		const report = rpc.notes[0].split("\n");
+		expect(report.slice(0, 3)).toEqual([
+			'3 results for "gcloud logging" · scope: this project (/proj/a)',
+			"",
+			"   Session        Project  Title            Date (UTC)  · Note below",
+		]);
+		expect(report[3]).toStartWith("1. 01dddddd-0003  /proj/a  ");
+		expect(report[4]).toBe("    Cloud Logging + gcloud");
+		expect(rpc.editor).toEqual(["/resume 01dddddd-0003"]);
+		expect(rpc.switched).toEqual([]);
+
+		const print = ctx("print");
+		await run("search-archive", "gcloud logging", print);
+		expect(print.notes).toHaveLength(1);
+		expect(print.editor).toEqual([]);
+
+		// Bare command in the TUI: the query is typed into a dialog, same syntax as inline.
+		const dialog = ctx("tui", { typed: "gcloud logging --all --limit 2", pick: () => undefined });
+		await run("search-full", "  ", dialog);
+		expect(dialog.inputs).toEqual(["/search-full: search past sessions"]);
+		expect(dialog.selects[0].title).toEqual([
+			'2 results for "gcloud logging" · scope: all projects',
+			"Showing the first 2 results; use --limit N for more.",
+			"   Session        Project  Title  Date (UTC)   Location  · Note below",
+		]);
+
+		// Dialog dismissed or left empty: nothing at all.
+		for (const typed of [undefined, "   "]) {
+			const dismissed = ctx("tui", { typed });
+			await run("search-archive", "", dismissed);
+			expect(dismissed.inputs).toHaveLength(1);
+			expect([dismissed.selects, dismissed.notes, dismissed.editor, dismissed.switched]).toEqual([[], [], [], []]);
+		}
+
+		// Invalid dialog input: usage warning.
+		const invalid = ctx("tui", { typed: "--all --limit 0" });
+		await run("search-archive", "", invalid);
+		expect(invalid.notes).toHaveLength(1);
+		expect(invalid.notes[0]).toContain("Usage: /search-archive");
+		expect(invalid.selects).toEqual([]);
+
+		// Outside the TUI a bare command has no dialog: usage warning.
+		const bare = ctx("rpc", { typed: "gcloud logging", supportsEditor: true });
+		await run("search-archive", "", bare);
+		expect(bare.inputs).toEqual([]);
+		expect(bare.notes).toHaveLength(1);
+		expect(bare.notes[0]).toContain("Usage: /search-archive");
+		expect(bare.editor).toEqual([]);
 	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}
+	expect(leaked).toEqual([]);
 });

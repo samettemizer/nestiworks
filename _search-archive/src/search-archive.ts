@@ -14,7 +14,7 @@ export const THINKING = "Model thinking";
 export const TITLE = "Session title";
 export const DEFAULT_LIMIT = 50;
 const SNIPPET_WIDTH = 150;
-const CUSTOM_TYPE = "search-archive";
+const COLUMN_CAP = 40;
 
 export interface Unit {
 	location: string;
@@ -23,6 +23,9 @@ export interface Unit {
 }
 
 export interface Row {
+	/** Session JSONL path and the cwd recorded in its header, for resuming it. */
+	file: string;
+	cwd: string;
 	session: string;
 	project: string;
 	title: string;
@@ -223,7 +226,8 @@ export async function scanSession(
 	}
 	if (!header) return undefined;
 	const title = slotTitle ?? changedTitle ?? (typeof header.title === "string" ? header.title : "");
-	const base = { session: header.id.slice(0, 13), project: tilde(String(header.cwd ?? "")), title };
+	const cwd = String(header.cwd ?? "");
+	const base = { file, cwd, session: header.id.slice(0, 13), project: tilde(cwd), title };
 	const rows: Row[] = hits.map(h => ({ ...base, at: h.at, location: h.location, note: matcher.snippet(h.text) }));
 	if (title && matcher.test(title)) {
 		rows.push({ ...base, at: Date.parse(String(header.timestamp)), location: TITLE, note: matcher.snippet(title) });
@@ -298,40 +302,76 @@ export function parseArgs(args: string): { query: string; all: boolean; limit: n
 	return query.length > 0 ? { query: query.join(" "), all, limit } : undefined;
 }
 
+/** One line: whitespace runs collapsed to single spaces, ends trimmed. */
+export function flat(text: string): string {
+	return text.replace(/\s+/g, " ").trim();
+}
+
 /**
- * One-line markdown table cell that renders as the literal text. ASCII punctuation is backslash-escaped,
- * so a `|` always has an odd run of backslashes before it (cell-safe for omp's parser, cmark-gfm and
- * marked) and no emphasis, code span, HTML or `$` math can form; `]` escaped blocks links. `(`, `)` and
- * `[` stay bare: omp's inline math extension runs before escapes and reads `\(` / `\[` as math openers.
- * A source backslash before them becomes `\\`, which the escape rule consumes first.
+ * One-line inline-markdown text that renders as the literal text (picker labels and notes go through
+ * omp's inline markdown). ASCII punctuation is backslash-escaped, so no emphasis, code span, HTML,
+ * link or `$` math can form. `(`, `)` and `[` stay bare: omp's inline math extension runs before
+ * escapes and reads `\(` / `\[` as math openers. A source backslash before them becomes `\\`, which
+ * the escape rule consumes first.
  */
 export function cell(text: string): string {
-	return text.replace(/\s+/g, " ").trim().replace(/[!-'*-/:-@\\-`{-~]/g, "\\$&");
+	return flat(text).replace(/[!-'*-/:-@\\-`{-~]/g, "\\$&");
 }
 
 export function formatDate(at: number): string {
 	return Number.isFinite(at) ? new Date(at).toISOString().slice(5, 16).replace("T", " ") : "";
 }
 
-export function renderTable(rows: Row[], mode: Mode): string {
+export interface Item {
+	label: string;
+	description: string;
+}
+
+/**
+ * Picker rows: `head` names the columns; each label is `i. ` and the row's columns padded to line up
+ * (padding capped at COLUMN_CAP, longer values overflow) and its description is the note. `escape`
+ * makes a value show literally on the target surface; padding stays outside it. The number keeps
+ * labels unique and gives `1.`-`9.` the selector's digit quick-pick.
+ */
+export function layout(rows: Row[], mode: Mode, escape: (text: string) => string): { head: string; items: Item[] } {
 	const full = mode === "full";
-	const line = (cells: string[]) => `| ${cells.map(cell).join(" | ")} |`;
-	const head = ["Session", "Project", "Title", "Date (UTC)", ...(full ? ["Location"] : []), "Note"];
-	return [
-		line(head),
-		`|${head.map(() => " --- ").join("|")}|`,
-		...rows.map(r =>
-			line([r.session, r.project, r.title, formatDate(r.at), ...(full ? [r.location] : []), r.note]),
-		),
-	].join("\n");
+	const names = ["Session", "Project", "Title", "Date (UTC)", ...(full ? ["Location"] : [])];
+	const table = rows.map(r =>
+		[r.session, r.project, r.title, formatDate(r.at), ...(full ? [r.location] : [])].map(flat),
+	);
+	const widths = names.map((name, c) =>
+		Math.min(COLUMN_CAP, Math.max(Bun.stringWidth(name), ...table.map(t => Bun.stringWidth(t[c])))),
+	);
+	const line = (cells: string[], esc: (text: string) => string) =>
+		cells
+			.map((t, c) => (c === cells.length - 1 ? esc(t) : esc(t) + " ".repeat(Math.max(0, widths[c] - Bun.stringWidth(t)))))
+			.join("  ");
+	const number = String(rows.length).length + 2;
+	return {
+		head: `${" ".repeat(number)}${line(names, flat)}  · Note below`,
+		items: table.map((cells, i) => ({
+			label: `${i + 1}.`.padEnd(number) + line(cells, escape),
+			description: escape(rows[i].note),
+		})),
+	};
 }
 
 export default function searchArchive(pi: ExtensionAPI) {
 	const run = (mode: Mode, command: string) => async (args: string, ctx: ExtensionCommandContext) => {
-		const parsed = parseArgs(args);
+		// omp's prompt history keeps every typed command line; a query typed into this dialog stays out of it.
+		let text = args;
+		if (!text.trim() && ctx.mode === "tui") {
+			const typed = await ctx.ui.input(`/${command}: search past sessions`, "<query> [--all] [--limit N]");
+			if (!typed?.trim()) return;
+			text = typed;
+		}
+		const parsed = parseArgs(text);
 		const matcher = parsed && compileQuery(parsed.query);
 		if (!parsed || !matcher) {
-			ctx.ui.notify(`Usage: /${command} <query> [--all] [--limit N]`, "warning");
+			ctx.ui.notify(
+				`Usage: /${command} <query> [--all] [--limit N], or /${command} alone to type the query in a dialog (TUI)`,
+				"warning",
+			);
 			return;
 		}
 		const { rows, limited } = await search({
@@ -343,23 +383,40 @@ export default function searchArchive(pi: ExtensionAPI) {
 			mode,
 			limit: parsed.limit,
 		});
-		const scope = `scope: ${parsed.all ? "all projects" : `this project (${cell(tilde(ctx.cwd))})`}`;
-		const query = `**"${cell(parsed.query)}"**`;
-		const lines = rows.length
-			? [`${rows.length} results for ${query} · ${scope}`, "", renderTable(rows, mode)]
-			: [`No results for ${query} · ${scope}`];
-		if (limited) lines.push("", `Showing the first ${parsed.limit} results; use \`--limit N\` for more.`);
-		pi.sendMessage({ customType: CUSTOM_TYPE, content: lines.join("\n"), display: true, excludeFromContext: true });
-		if (rows.length && ctx.ui.supportsEditor === true) ctx.ui.setEditorText(`/resume ${rows[0].session}`);
+		// Shown, never saved: a picker in the TUI, a notification elsewhere; no session entry, no file.
+		const scope = `scope: ${parsed.all ? "all projects" : `this project (${tilde(ctx.cwd)})`}`;
+		const query = `"${flat(parsed.query)}"`;
+		if (!rows.length) {
+			ctx.ui.notify(`No results for ${query} · ${scope}`, "info");
+			return;
+		}
+		const heading = [`${rows.length} results for ${query} · ${scope}`];
+		if (limited) heading.push(`Showing the first ${parsed.limit} results; use --limit N for more.`);
+		if (ctx.mode !== "tui") {
+			const { head, items } = layout(rows, mode, flat);
+			const report = items.flatMap(i => (i.description ? [i.label, `    ${i.description}`] : [i.label]));
+			ctx.ui.notify([...heading, "", head, ...report].join("\n"), "info");
+			if (ctx.ui.supportsEditor === true) ctx.ui.setEditorText(`/resume ${rows[0].session}`);
+			return;
+		}
+		const { head, items } = layout(rows, mode, cell);
+		const picked = await ctx.ui.select([...heading, head].join("\n"), items);
+		const row = rows[items.findIndex(i => i.label === picked)];
+		if (!row) return;
+		// The extension switch has no cwd-change hook, so omp rejects another project's session there;
+		// `/resume` moves the process to that project.
+		if (resolve(row.cwd) === resolve(ctx.cwd) && !(await ctx.switchSession(row.file)).cancelled) return;
+		ctx.ui.setEditorText(`/resume ${row.session}`);
 	};
 
 	pi.registerCommand("search-archive", {
-		description: "Search past sessions' user and model messages. Usage: /search-archive <query> [--all] [--limit N]",
+		description:
+			"Search past sessions' user and model messages. Usage: /search-archive <query> [--all] [--limit N]; bare: type the query in a dialog, kept out of prompt history",
 		handler: run("archive", "search-archive"),
 	});
 	pi.registerCommand("search-full", {
 		description:
-			"Search past sessions including thinking, tool calls and tool output. Usage: /search-full <query> [--all] [--limit N]",
+			"Search past sessions including thinking, tool calls and tool output. Usage: /search-full <query> [--all] [--limit N]; bare: type the query in a dialog, kept out of prompt history",
 		handler: run("full", "search-full"),
 	});
 }
