@@ -51,7 +51,7 @@ test("case and accents (Turkish included) are ignored", () => {
 	expect(matcher("ılık").test("ILIK su")).toBe(true);
 	expect(matcher("ILIK").test("ılık su")).toBe(true);
 	expect(matcher("cafe").test("Café au lait")).toBe(true);
-	expect(matcher("açılır").test("gcloud logging nasıl AÇILIR?")).toBe(true);
+	expect(matcher("naive resume").test("Naïve RÉSUMÉ")).toBe(true);
 });
 
 test("punctuation inside a query word matches punctuation or space, parts adjacent", () => {
@@ -85,8 +85,8 @@ test("snippet is one line, centered on the first hit, with ellipsis", () => {
 test("archive mode: only user-typed and model text; malformed lines skipped", async () => {
 	const rows = await scanSession(FIXTURE, matcher("gcloud logging"), "archive", () => true);
 	expect(rows?.map(r => [r.location, r.at, r.note])).toEqual([
-		[REPLY, Date.parse("2026-11-20T10:01:00Z"), "Önce gcloud CLI kurun, ardından Cloud Logging API'sini etkinleştirin."],
-		[USER, Date.parse("2026-11-20T10:00:00Z"), "gcloud logging nasıl açılır?"],
+		[REPLY, Date.parse("2026-11-20T10:01:00Z"), "First install the gcloud CLI, then enable the Cloud Logging API."],
+		[USER, Date.parse("2026-11-20T10:00:00Z"), "how do I enable gcloud logging?"],
 	]);
 	expect(rows?.[0]).toMatchObject({ session: "01aaaaaa-0001", project: "/proj/a", title: "Logging | setup" });
 });
@@ -94,8 +94,8 @@ test("archive mode: only user-typed and model text; malformed lines skipped", as
 test("full mode labels thinking, tool calls and tool output", async () => {
 	const rows = await scanSession(FIXTURE, matcher("gcloud logging"), "full", () => true);
 	expect(rows?.map(r => r.location)).toEqual([
-		"Araç çıktısı (bash)",
-		"Araç çağrısı (bash)",
+		"Tool output (bash)",
+		"Tool call (bash)",
 		REPLY,
 		THINKING,
 		USER,
@@ -103,7 +103,7 @@ test("full mode labels thinking, tool calls and tool output", async () => {
 	expect(rows?.[1].note).toBe("bash gcloud logging read --limit 5 30");
 	// Tool arguments are matched by value: `--limit 5` and the numeric timeout are searchable.
 	expect((await scanSession(FIXTURE, matcher("limit 30"), "full", () => true))?.map(r => r.location)).toEqual([
-		"Araç çağrısı (bash)",
+		"Tool call (bash)",
 	]);
 	expect(await scanSession(FIXTURE, matcher("permission denied"), "archive", () => true)).toEqual([]);
 });
@@ -193,9 +193,9 @@ test("title_change and toolResult are decided by the parsed entry, not nested lo
 		const archive = await scanSession(file, matcher("needle"), "archive", () => true);
 		expect(archive?.map(r => [r.location, r.title])).toEqual([[REPLY, "Real title"]]);
 		const full = await scanSession(file, matcher("title change"), "full", () => true);
-		expect(full?.map(r => r.location)).toEqual(["Araç çağrısı (eval)"]);
+		expect(full?.map(r => r.location)).toEqual(["Tool call (eval)"]);
 		expect((await scanSession(file, matcher("needle"), "full", () => true))?.map(r => r.location)).toEqual([
-			"Araç çıktısı (eval)",
+			"Tool output (eval)",
 			REPLY,
 		]);
 	} finally {
@@ -220,12 +220,12 @@ test("toolResult prefilter matches only top-level tool results", () => {
 test("tools without a name get labels without parentheses", () => {
 	const at = "2026-11-20T10:00:00Z";
 	const call = messageUnits(assistant(at, "", [{ type: "toolCall", id: "t", arguments: { command: "needle" } }]), "full");
-	expect(call).toEqual([{ location: "Araç çağrısı", text: "needle", at: Date.parse(at) }]);
+	expect(call).toEqual([{ location: "Tool call", text: "needle", at: Date.parse(at) }]);
 	const result = messageUnits(
 		{ timestamp: at, message: { role: "toolResult", toolName: "", content: [{ type: "text", text: "needle" }] } },
 		"full",
 	);
-	expect(result).toEqual([{ location: "Araç çıktısı", text: "needle", at: Date.parse(at) }]);
+	expect(result).toEqual([{ location: "Tool output", text: "needle", at: Date.parse(at) }]);
 });
 
 function session(id: string, cwd: string, text: string, at: string): string {
@@ -295,23 +295,23 @@ const row: Row = {
 	project: "~/www/x",
 	title: "a | b\nc",
 	at: Date.parse("2026-11-20T10:01:00Z"),
-	location: "Araç çıktısı (bash)",
+	location: "Tool output (bash)",
 	note: "x|y\nz",
 };
 
 test("table rendering: headers, column order, literal cell escaping", () => {
 	expect(renderTable([row], "archive")).toBe(
 		[
-			"| Oturum | Proje | Başlık | Tarih (UTC) | Not |",
+			"| Session | Project | Title | Date (UTC) | Note |",
 			"| --- | --- | --- | --- | --- |",
 			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | x\\|y z |",
 		].join("\n"),
 	);
 	expect(renderTable([row], "full")).toBe(
 		[
-			"| Oturum | Proje | Başlık | Tarih (UTC) | Konum | Not |",
+			"| Session | Project | Title | Date (UTC) | Location | Note |",
 			"| --- | --- | --- | --- | --- | --- |",
-			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | Araç çıktısı (bash) | x\\|y z |",
+			"| 01aaaaaa\\-0001 | \\~\\/www\\/x | a \\| b c | 11\\-20 10\\:01 | Tool output (bash) | x\\|y z |",
 		].join("\n"),
 	);
 	expect(cell("  a\r\n\tb | c  ")).toBe("a b \\| c");
@@ -395,17 +395,17 @@ test("escaped cells round-trip to the literal text under omp (math included), cm
 			project: "[a](b)",
 			title: "[x]",
 			at,
-			location: "Araç çağrısı (bash)",
+			location: "Tool call (bash)",
 			note: "$5 and $6 \\(m\\) \\[n\\] $$z$$ ~~s~~ ![i](j)",
 		},
 	];
 	const lines = renderTable(rows, "full").split("\n");
-	expect(lines[0]).toContain("| Tarih (UTC) |");
-	expect(lines[3]).toContain("| Araç çağrısı (bash) |");
+	expect(lines[0]).toContain("| Date (UTC) |");
+	expect(lines[3]).toContain("| Tool call (bash) |");
 	for (const [rule, escaped] of Object.entries(pipeRules)) {
 		expect([rule, decodeRow(lines[0], escaped)]).toEqual([
 			rule,
-			["Oturum", "Proje", "Başlık", "Tarih (UTC)", "Konum", "Not"],
+			["Session", "Project", "Title", "Date (UTC)", "Location", "Note"],
 		]);
 		rows.forEach((r, i) => {
 			expect([rule, decodeRow(lines[2 + i], escaped)]).toEqual([
@@ -415,7 +415,7 @@ test("escaped cells round-trip to the literal text under omp (math included), cm
 		});
 	}
 	// The rule rejects what the previous escaping produced: an escaped paren or a bare `$` opens math.
-	expect(() => decodeInline("Tarih \\(UTC\\)")).toThrow("math opener");
+	expect(() => decodeInline("Date \\(UTC\\)")).toThrow("math opener");
 	expect(() => decodeInline("$5")).toThrow("math opener");
 });
 
@@ -462,32 +462,33 @@ test("commands: table message, resume prefill only with editor support", async (
 		const tui = ctx(true);
 		await commands.get("search-archive")?.("gcloud logging", tui);
 		expect(sent[0]).toMatchObject({ customType: "search-archive", display: true, excludeFromContext: true });
-		expect(sent[0].content).toContain("| Oturum | Proje | Başlık | Tarih (UTC) | Not |");
-		expect(sent[0].content).toContain("3 sonuç · kapsam: bu proje (\\/proj\\/a)");
+		expect(sent[0].content).toContain("| Session | Project | Title | Date (UTC) | Note |");
+		expect(sent[0].content).toContain("3 results for");
+		expect(sent[0].content).toContain("scope: this project (\\/proj\\/a)");
 		expect(sent[0].content).not.toContain("current");
-		expect(sent[0].content).not.toContain("İlk");
+		expect(sent[0].content).not.toContain("Showing the first");
 		expect(tui.editor).toEqual(["/resume 01dddddd-0003"]);
 
 		const headless = ctx(undefined);
 		await commands.get("search-full")?.("permission denied --all", headless);
-		expect(sent[1].content).toContain("| Konum | Not |");
-		expect(sent[1].content).toContain("Araç çıktısı (bash)");
-		expect(sent[1].content).toContain("kapsam: tüm projeler");
+		expect(sent[1].content).toContain("| Location | Note |");
+		expect(sent[1].content).toContain("Tool output (bash)");
+		expect(sent[1].content).toContain("scope: all projects");
 		expect(headless.editor).toEqual([]);
 
 		const none = ctx(true);
 		await commands.get("search-archive")?.("zzzz-nothing", none);
-		expect(sent[2].content).toContain("sonuç bulunamadı");
+		expect(sent[2].content).toContain("No results for");
 		expect(none.editor).toEqual([]);
 
 		await commands.get("search-archive")?.("--all", none);
-		expect(none.notes[0]).toContain("Kullanım: /search-archive");
+		expect(none.notes[0]).toContain("Usage: /search-archive");
 		expect(sent).toHaveLength(3);
 
 		await commands.get("search-archive")?.("gcloud logging --limit 3", none);
-		expect(sent[3].content).not.toContain("İlk");
+		expect(sent[3].content).not.toContain("Showing the first");
 		await commands.get("search-archive")?.("gcloud logging --limit 2", none);
-		expect(sent[4].content).toContain("İlk 2 sonuç gösteriliyor");
+		expect(sent[4].content).toContain("Showing the first 2 results");
 	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}

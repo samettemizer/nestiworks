@@ -6,6 +6,7 @@ Improvements and documentation contributions are welcome.
 
 - Keep changes small and consistent with the existing project.
 - Briefly explain what changed and how you checked it.
+- Write everything in English: code, comments, user-facing text, documentation, and commit messages.
 - Use the commit format below for all commits in your PR.
 - The **Commit messages** check validates every commit title.
 

@@ -8,10 +8,10 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-
 
 export type Mode = "archive" | "full";
 
-export const USER = "Kullanıcı mesajı";
-export const REPLY = "Model yanıtı";
-export const THINKING = "Model düşüncesi";
-export const TITLE = "Oturum başlığı";
+export const USER = "User message";
+export const REPLY = "Model reply";
+export const THINKING = "Model thinking";
+export const TITLE = "Session title";
 export const DEFAULT_LIMIT = 50;
 const SNIPPET_WIDTH = 150;
 const CUSTOM_TYPE = "search-archive";
@@ -127,12 +127,12 @@ export function messageUnits(entry: { timestamp?: unknown; message?: unknown }, 
 			for (const b of m.content) {
 				if (b?.type !== "toolCall") continue;
 				const name = typeof b.name === "string" && b.name ? b.name : undefined;
-				add(toolLabel("Araç çağrısı", name), [...(name ? [name] : []), ...values(b.arguments)].join("\n"));
+				add(toolLabel("Tool call", name), [...(name ? [name] : []), ...values(b.arguments)].join("\n"));
 			}
 		}
 	} else if (m.role === "toolResult" && mode === "full") {
 		const name = typeof m.toolName === "string" && m.toolName ? m.toolName : undefined;
-		add(toolLabel("Araç çıktısı", name), blockText(m.content, "text", "text"));
+		add(toolLabel("Tool output", name), blockText(m.content, "text", "text"));
 	}
 	return units;
 }
@@ -316,7 +316,7 @@ export function formatDate(at: number): string {
 export function renderTable(rows: Row[], mode: Mode): string {
 	const full = mode === "full";
 	const line = (cells: string[]) => `| ${cells.map(cell).join(" | ")} |`;
-	const head = ["Oturum", "Proje", "Başlık", "Tarih (UTC)", ...(full ? ["Konum"] : []), "Not"];
+	const head = ["Session", "Project", "Title", "Date (UTC)", ...(full ? ["Location"] : []), "Note"];
 	return [
 		line(head),
 		`|${head.map(() => " --- ").join("|")}|`,
@@ -331,7 +331,7 @@ export default function searchArchive(pi: ExtensionAPI) {
 		const parsed = parseArgs(args);
 		const matcher = parsed && compileQuery(parsed.query);
 		if (!parsed || !matcher) {
-			ctx.ui.notify(`Kullanım: /${command} <sorgu> [--all] [--limit N]`, "warning");
+			ctx.ui.notify(`Usage: /${command} <query> [--all] [--limit N]`, "warning");
 			return;
 		}
 		const { rows, limited } = await search({
@@ -343,12 +343,12 @@ export default function searchArchive(pi: ExtensionAPI) {
 			mode,
 			limit: parsed.limit,
 		});
-		const scope = `kapsam: ${parsed.all ? "tüm projeler" : `bu proje (${cell(tilde(ctx.cwd))})`}`;
+		const scope = `scope: ${parsed.all ? "all projects" : `this project (${cell(tilde(ctx.cwd))})`}`;
 		const query = `**"${cell(parsed.query)}"**`;
 		const lines = rows.length
-			? [`${query} için ${rows.length} sonuç · ${scope}`, "", renderTable(rows, mode)]
-			: [`${query} için sonuç bulunamadı · ${scope}`];
-		if (limited) lines.push("", `İlk ${parsed.limit} sonuç gösteriliyor; daha fazlası için \`--limit N\`.`);
+			? [`${rows.length} results for ${query} · ${scope}`, "", renderTable(rows, mode)]
+			: [`No results for ${query} · ${scope}`];
+		if (limited) lines.push("", `Showing the first ${parsed.limit} results; use \`--limit N\` for more.`);
 		pi.sendMessage({ customType: CUSTOM_TYPE, content: lines.join("\n"), display: true, excludeFromContext: true });
 		if (rows.length && ctx.ui.supportsEditor === true) ctx.ui.setEditorText(`/resume ${rows[0].session}`);
 	};

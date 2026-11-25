@@ -30,14 +30,14 @@ Results appear as a table in the transcript (shown to you, not sent to the model
 
 | Column | Content |
 | --- | --- |
-| `Oturum` | First 13 characters of the session id, which `/resume` accepts as a prefix |
-| `Proje` | Project directory, `~`-abbreviated |
-| `Başlık` | Session title |
-| `Tarih (UTC)` | Message time, `MM-DD HH:MM` |
-| `Konum` | `/search-full` only: `Kullanıcı mesajı`, `Model yanıtı`, `Model düşüncesi`, `Araç çağrısı (<tool>)`, `Araç çıktısı (<tool>)` or `Oturum başlığı` |
-| `Not` | One-line excerpt of about 150 characters around the first hit |
+| `Session` | First 13 characters of the session id, which `/resume` accepts as a prefix |
+| `Project` | Project directory, `~`-abbreviated |
+| `Title` | Session title |
+| `Date (UTC)` | Message time, `MM-DD HH:MM` |
+| `Location` | `/search-full` only: `User message`, `Model reply`, `Model thinking`, `Tool call (<tool>)`, `Tool output (<tool>)` or `Session title` |
+| `Note` | One-line excerpt of about 150 characters around the first hit |
 
-When there is at least one result, the composer is prefilled with `/resume <first session id>`; press Enter to jump there. Hosts without an editable composer skip the prefill. No match prints `sonuç bulunamadı`.
+When there is at least one result, the composer is prefilled with `/resume <first session id>`; press Enter to jump there. Hosts without an editable composer skip the prefill. No match prints `No results for <query>`.
 
 ## Matching
 
