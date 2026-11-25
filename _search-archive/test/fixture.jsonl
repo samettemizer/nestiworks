@@ -1,0 +1,12 @@
+{"type":"title","v":1,"title":"Logging | setup","source":"auto","updatedAt":"2026-11-20T10:05:00.000Z","pad":"          "}
+{"type":"session","version":3,"id":"01aaaaaa-0001-7000-8000-000000000001","timestamp":"2026-11-20T09:59:00.000Z","cwd":"/proj/a"}
+{"type":"thinking_level_change","id":"e0","parentId":null,"timestamp":"2026-11-20T09:59:00.001Z","thinkingLevel":"high"}
+{"type":"message","id":"e1","parentId":"e0","timestamp":"2026-11-20T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"gcloud logging nasıl açılır?"}],"attribution":"user","timestamp":1795168800000}}
+{"type":"message","id":"e2","parentId":"e1","timestamp":"2026-11-20T10:01:00.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"The user wants gcloud logging enabled.","thinkingSignature":"x"},{"type":"text","text":"Önce gcloud CLI kurun, ardından Cloud Logging API'sini etkinleştirin."},{"type":"toolCall","id":"t1","name":"bash","arguments":{"command":"gcloud logging read --limit 5","timeout":30}}],"stopReason":"toolUse","timestamp":1795168860000}}
+{"type":"message","id":"e3","parentId":"e2","timestamp":"2026-11-20T10:02:00.000Z","message":{"role":"toolResult","toolCallId":"t1","toolName":"bash","content":[{"type":"text","text":"ERROR: gcloud logging: permission denied"}],"isError":true,"timestamp":1795168920000}}
+{"type":"message","id":"e4","parentId":"e3","timestamp":"2026-11-20T10:03:00.000Z","message":{"role":"user","content":[{"type":"text","text":"gcloud logging relayed by an agent"}],"attribution":"agent","timestamp":1795168980000}}
+{"type":"message","id":"e5","parentId":"e4","timestamp":"2026-11-20T10:03:30.000Z","message":{"role":"developer","content":[{"type":"text","text":"gcloud logging system notice"}],"synthetic":true,"timestamp":1795169010000}}
+{"type":"custom_message","id":"e6","parentId":"e5","timestamp":"2026-11-20T10:04:00.000Z","customType":"search-archive","content":"gcloud logging earlier result table","display":true,"excludeFromContext":true}
+{"type":"message", this line is broken "gcloud logging"
+{"type":"title_change","id":"e7","parentId":"e6","timestamp":"2026-11-20T10:05:00.000Z","title":"Old title","source":"auto"}
+{"type":"message","id":"e8","parentId":"e7","timestamp":"2026-11-20T10:06:00.000Z","message":{"role":"user","content":[{"type":"text","text":"gcloud logg

@@ -1,6 +1,6 @@
 # nestiworks
 
-A marketplace of 25 plugins for [oh-my-pi (omp)](https://omp.sh/): language- and framework-focused CTO team modes, plus a generic option. The CTO coordinates planning, implementation and review through specialist agents.
+A marketplace of 26 plugins for [oh-my-pi (omp)](https://omp.sh/): language- and framework-focused CTO team modes, a generic option, plus one utility. The CTO coordinates planning, implementation and review through specialist agents.
 
 ## Get started
 
@@ -47,6 +47,14 @@ See the official [omp marketplace documentation](https://github.com/can1357/oh-m
 | [swift](swift/README.md) | Actor isolation, ARC and deployment-aware APIs |
 | [typescript](typescript/README.md) | Compiler/runtime alignment and boundary validation |
 | [vue](vue/README.md) | Reactive identity, watcher cleanup and SSR isolation |
+
+### Utilities
+
+Utilities are not team modes: they add no `/cto` or agents and can be installed alongside any team-mode plugin.
+
+| Plugin | Focus |
+| --- | --- |
+| [search-archive](_search-archive/README.md) | `/search-archive` and `/search-full`: search past session transcripts and prefill `/resume` |
 
 ## Contributing
 

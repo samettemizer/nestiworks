@@ -206,6 +206,14 @@
 			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"
+		},
+		{
+			"name": "search-archive",
+			"source": "./_search-archive",
+			"description": "Utility (not a team mode): /search-archive and /search-full search past omp session transcripts",
+			"version": "1.0.0",
+			"license": "MIT",
+			"category": "productivity"
 		}
 	]
 }
