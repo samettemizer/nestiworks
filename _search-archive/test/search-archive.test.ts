@@ -5,6 +5,7 @@ import { join } from "node:path";
 import searchArchive, {
 	cell,
 	compileQuery,
+	compileRegex,
 	flat,
 	formatDate,
 	type Item,
@@ -82,6 +83,49 @@ test("snippet is one line, centered on the first hit, with ellipsis", () => {
 	// The hit maps back correctly after accented characters.
 	const accented = `${"ğüşiöç ".repeat(40)}İĞNE${" x".repeat(100)}`;
 	expect(matcher("igne").snippet(accented)).toContain("İĞNE");
+});
+
+test("regex mode: case-insensitive JavaScript regex on the raw text, not word prefixes", () => {
+	const deploy = compileRegex("deploy.*(staging|prod)");
+	expect(deploy.test("Deploy to PROD now")).toBe(true);
+	expect(deploy.test("we deploy on Staging")).toBe(true);
+	expect(deploy.test("DEPLOY.. prod")).toBe(true);
+	expect(deploy.test("deployment notes")).toBe(false);
+	const status = compileRegex("error \\d{3}");
+	expect(status.test("ERROR 404 from the API")).toBe(true);
+	expect(status.test("error 12")).toBe(false);
+	expect(compileRegex("LOGGING").test("cloud logging")).toBe(true);
+	// Infix hits, which word mode rejects.
+	expect(compileRegex("ogging").test("Cloud Logging")).toBe(true);
+	expect(matcher("ogging").test("Cloud Logging")).toBe(false);
+	// No accent folding: the pattern is literal apart from case.
+	expect(compileRegex("café").test("CAFÉ au lait")).toBe(true);
+	expect(compileRegex("cafe").test("Café au lait")).toBe(false);
+});
+
+test("regex mode: invalid patterns throw SyntaxError", () => {
+	for (const p of ["(", "[", "*", "a{2,1}"]) expect(() => compileRegex(p)).toThrow(SyntaxError);
+});
+
+test("regex mode: snippet centers on the first hit; zero-length matches are safe", () => {
+	const long = `${"b ".repeat(200)}the Café here${" c".repeat(200)}`;
+	const s = compileRegex("caf.").snippet(long);
+	expect(s).toContain("the Café here");
+	expect(s.startsWith("…") && s.endsWith("…")).toBe(true);
+	expect(Array.from(s).length).toBeLessThanOrEqual(152);
+	// `a*` matches everywhere, empty at first; the excerpt centers on the first non-empty run.
+	const stars = compileRegex("a*");
+	const runs = `${"b ".repeat(200)}aaaa${" c".repeat(200)}`;
+	expect(stars.test("xyz")).toBe(true);
+	expect(stars.snippet(runs)).toContain("aaaa");
+	// Only empty matches: the excerpt falls back to the start.
+	for (const p of ["x*", "^", "(?:)"]) {
+		const m = compileRegex(p);
+		expect(m.test(runs)).toBe(true);
+		const e = m.snippet(runs);
+		expect(e.startsWith("b b")).toBe(true);
+		expect(Array.from(e).length).toBeLessThanOrEqual(151);
+	}
 });
 
 test("archive mode: only user-typed and model text; malformed lines skipped", async () => {
@@ -388,14 +432,37 @@ test("escaped labels and notes round-trip to the literal text under omp's inline
 });
 
 test("argument parsing", () => {
-	expect(parseArgs("gcloud logging")).toEqual({ query: "gcloud logging", all: false, limit: 50 });
-	expect(parseArgs("gcloud --all logging --limit 5")).toEqual({ query: "gcloud logging", all: true, limit: 5 });
-	expect(parseArgs("--limit=7 x")).toEqual({ query: "x", all: false, limit: 7 });
+	expect(parseArgs("gcloud logging")).toEqual({ query: "gcloud logging", all: false, limit: 50, regex: false });
+	expect(parseArgs("gcloud --all logging --limit 5")).toEqual({ query: "gcloud logging", all: true, limit: 5, regex: false });
+	expect(parseArgs("--limit=7 x")).toEqual({ query: "x", all: false, limit: 7, regex: false });
 	expect(parseArgs("x --limit")).toBeUndefined();
 	expect(parseArgs("x --limit 0")).toBeUndefined();
 	expect(parseArgs("x --limit abc")).toBeUndefined();
 	expect(parseArgs("--all")).toBeUndefined();
 	expect(parseArgs("   ")).toBeUndefined();
+	// Without --regex, quotes are not special and flags are found by whitespace split, as before.
+	expect(parseArgs('"x --all y"')).toEqual({ query: '"x y"', all: true, limit: 50, regex: false });
+});
+
+test("argument parsing with --regex: any position, quoted patterns verbatim", () => {
+	expect(parseArgs('--regex "deploy.*(staging|prod)"')).toEqual({
+		query: "deploy.*(staging|prod)",
+		all: false,
+		limit: 50,
+		regex: true,
+	});
+	expect(parseArgs('"error \\d{3}"  --all --regex')).toEqual({ query: "error \\d{3}", all: true, limit: 50, regex: true });
+	expect(parseArgs("--limit 3 err\\w+ --regex --all")).toEqual({ query: "err\\w+", all: true, limit: 3, regex: true });
+	// Inside quotes, spaces and flag-like words are part of the pattern.
+	expect(parseArgs('--regex "a  --all b"')).toEqual({ query: "a  --all b", all: false, limit: 50, regex: true });
+	// Unquoted words join with one space; an unclosed quote stays literal.
+	expect(parseArgs('--regex say "hi')).toEqual({ query: 'say "hi', all: false, limit: 50, regex: true });
+	// A quoted "--regex" is a pattern, not the flag.
+	expect(parseArgs('"--regex"')).toEqual({ query: '"--regex"', all: false, limit: 50, regex: false });
+	expect(parseArgs("--regex")).toBeUndefined();
+	expect(parseArgs('--regex ""')).toBeUndefined();
+	expect(parseArgs("--regex --all")).toBeUndefined();
+	expect(parseArgs('--regex "x" --limit 0')).toBeUndefined();
 });
 
 test("commands: picker in the TUI resumes the pick, notification elsewhere, nothing sent or saved", async () => {
@@ -560,6 +627,44 @@ test("commands: picker in the TUI resumes the pick, notification elsewhere, noth
 		expect(bare.notes).toHaveLength(1);
 		expect(bare.notes[0]).toContain("Usage: /search-archive");
 		expect(bare.editor).toEqual([]);
+
+		// --regex: infix hits word mode misses; heading marks the pattern as a regex.
+		const words = ctx("tui");
+		await run("search-archive", "loud logging", words);
+		expect(words.notes).toEqual(['No results for "loud logging" · scope: this project (/proj/a)']);
+		const regex = ctx("tui", { pick: () => undefined });
+		await run("search-archive", '--regex "LOUD\\s+logging"', regex);
+		expect(regex.selects[0].title[0]).toBe('3 results for regex "LOUD\\s+logging" · scope: this project (/proj/a)');
+		expect(sessions(regex)).toEqual(["1. 01dddddd\\-0003", "2. 01aaaaaa\\-0001", "3. 01aaaaaa\\-0001"]);
+
+		// --regex with --all on /search-full reaches tool output in other positions too.
+		const full = ctx("rpc");
+		await run("search-full", '"permission (denied|granted)" --all --regex', full);
+		expect(full.notes).toHaveLength(1);
+		const lines = full.notes[0].split("\n");
+		expect(lines[0]).toBe('1 results for regex "permission (denied|granted)" · scope: all projects');
+		expect(lines[3]).toEndWith("  Tool output (bash)");
+		expect(lines[4]).toBe("    ERROR: gcloud logging: permission denied");
+
+		// Invalid pattern: one clear warning, no search, no picker.
+		for (const name of ["search-archive", "search-full"]) {
+			const bad = ctx("tui", { supportsEditor: true });
+			await run(name, '--regex "(" --all', bad);
+			expect(bad.notes).toEqual(['Invalid regular expression "(": missing ). Nothing was searched.']);
+			expect([bad.selects, bad.editor, bad.switched]).toEqual([[], [], []]);
+		}
+
+		// Bare --regex is a flag without a query: usage, like --all alone.
+		const flagOnly = ctx("tui");
+		await run("search-full", "--regex", flagOnly);
+		expect(flagOnly.inputs).toEqual([]);
+		expect(flagOnly.notes[0]).toContain("Usage: /search-full <query> [--all] [--limit N] [--regex]");
+
+		// The dialog takes --regex like any other flag.
+		const regexDialog = ctx("tui", { typed: '--all --regex "^gcloud logging in"', pick: () => undefined });
+		await run("search-archive", "", regexDialog);
+		expect(regexDialog.selects[0].title[0]).toBe('1 results for regex "^gcloud logging in" · scope: all projects');
+		expect(sessions(regexDialog)).toEqual(["1. 01eeeeee\\-0004"]);
 	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}

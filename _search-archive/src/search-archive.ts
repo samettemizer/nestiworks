@@ -58,24 +58,41 @@ export function compileQuery(query: string): Matcher | undefined {
 		.filter(parts => parts.length > 0)
 		.map(parts => new RegExp(`(?<!${WORD})${parts.join(SEP)}`, "u"));
 	if (patterns.length === 0) return undefined;
+	const finders = patterns.map(p => new RegExp(p.source, "gu"));
 	return {
 		test: text => {
 			const norm = normalize(text);
 			return patterns.every(p => p.test(norm));
 		},
-		snippet: (text, width = SNIPPET_WIDTH) => snippet(text, patterns, width),
+		snippet: (text, width = SNIPPET_WIDTH) => snippet(text, finders, width, true),
 	};
 }
 
-/** Single-line excerpt of about `width` characters centered on the earliest hit. */
-function snippet(text: string, patterns: RegExp[], width: number): string {
+/**
+ * The pattern as a case-insensitive regular expression, matched against the raw text (no accent
+ * folding, no word-prefix rule). Throws `SyntaxError` for an invalid pattern.
+ */
+export function compileRegex(pattern: string): Matcher {
+	const re = new RegExp(pattern, "i");
+	const finder = new RegExp(pattern, "gi");
+	return {
+		test: text => re.test(text),
+		snippet: (text, width = SNIPPET_WIDTH) => snippet(text, [finder], width, false),
+	};
+}
+
+/**
+ * Single-line excerpt of about `width` characters centered on the earliest non-empty hit of the global
+ * `patterns`; `fold` matches them against the case- and accent-folded text.
+ */
+function snippet(text: string, patterns: RegExp[], width: number, fold: boolean): string {
 	const chars = Array.from(text.replace(/\s+/g, " ").trim());
 	if (chars.length <= width) return chars.join("");
-	// Normalize per character so a hit in the normalized text maps back to an original position.
+	// Fold per character so a hit in the folded text maps back to an original position.
 	let norm = "";
 	const origin: number[] = [];
 	chars.forEach((c, i) => {
-		const n = c.charCodeAt(0) < 128 ? c.toLowerCase() : normalize(c);
+		const n = !fold ? c : c.charCodeAt(0) < 128 ? c.toLowerCase() : normalize(c);
 		norm += n;
 		for (let k = 0; k < n.length; k++) origin.push(i);
 	});
@@ -83,11 +100,14 @@ function snippet(text: string, patterns: RegExp[], width: number): string {
 	let to = 0;
 	let best = Number.POSITIVE_INFINITY;
 	for (const p of patterns) {
-		const m = p.exec(norm);
-		if (m && m.index < best && m[0].length > 0) {
+		// matchAll steps past zero-length matches, so patterns like `a*` cannot loop.
+		for (const m of norm.matchAll(p)) {
+			if (m.index >= best) break;
+			if (m[0].length === 0) continue;
 			best = m.index;
 			from = origin[m.index];
 			to = origin[m.index + m[0].length - 1] + 1;
+			break;
 		}
 	}
 	const start = Math.max(0, Math.min(chars.length - width, Math.floor((from + to - width) / 2)));
@@ -285,21 +305,32 @@ export async function search(o: SearchOptions): Promise<{ rows: Row[]; limited: 
 	return { rows: rows.slice(0, o.limit), limited: rows.length > o.limit };
 }
 
-export function parseArgs(args: string): { query: string; all: boolean; limit: number } | undefined {
-	const words = args.trim().split(/\s+/).filter(Boolean);
+/** Raw double-quote-aware tokens; an unclosed quote stays literal. */
+const TOKEN = /(?:"[^"]*"|[^\s"]+|")+/g;
+
+/**
+ * Flags may sit anywhere. With `--regex`, double-quoted text is one verbatim token (spaces, backslashes
+ * and flag-like words kept, quotes dropped); without it the query is split on whitespace.
+ */
+export function parseArgs(args: string): { query: string; all: boolean; limit: number; regex: boolean } | undefined {
+	const tokens = args.match(TOKEN) ?? [];
+	const regex = tokens.includes("--regex");
+	const words = regex ? tokens : args.trim().split(/\s+/).filter(Boolean);
 	const query: string[] = [];
 	let all = false;
 	let limit = DEFAULT_LIMIT;
 	for (let i = 0; i < words.length; i++) {
 		const w = words[i];
 		if (w === "--all") all = true;
+		else if (w === "--regex") continue;
 		else if (w === "--limit" || w.startsWith("--limit=")) {
 			const v = w === "--limit" ? words[++i] : w.slice("--limit=".length);
 			if (!v || !/^\d+$/.test(v) || Number(v) < 1) return undefined;
 			limit = Number(v);
-		} else query.push(w);
+		} else query.push(regex ? w.replace(/"([^"]*)"/g, "$1") : w);
 	}
-	return query.length > 0 ? { query: query.join(" "), all, limit } : undefined;
+	const text = query.join(" ");
+	return text ? { query: text, all, limit, regex } : undefined;
 }
 
 /** One line: whitespace runs collapsed to single spaces, ends trimmed. */
@@ -361,15 +392,23 @@ export default function searchArchive(pi: ExtensionAPI) {
 		// omp's prompt history keeps every typed command line; a query typed into this dialog stays out of it.
 		let text = args;
 		if (!text.trim() && ctx.mode === "tui") {
-			const typed = await ctx.ui.input(`/${command}: search past sessions`, "<query> [--all] [--limit N]");
+			const typed = await ctx.ui.input(`/${command}: search past sessions`, "<query> [--all] [--limit N] [--regex]");
 			if (!typed?.trim()) return;
 			text = typed;
 		}
 		const parsed = parseArgs(text);
-		const matcher = parsed && compileQuery(parsed.query);
+		let matcher: Matcher | undefined;
+		try {
+			matcher = parsed && (parsed.regex ? compileRegex(parsed.query) : compileQuery(parsed.query));
+		} catch (error) {
+			if (!(error instanceof SyntaxError)) throw error;
+			const reason = error.message.replace(/^Invalid regular expression:\s*/, "");
+			ctx.ui.notify(`Invalid regular expression "${flat(parsed?.query ?? "")}": ${reason}. Nothing was searched.`, "warning");
+			return;
+		}
 		if (!parsed || !matcher) {
 			ctx.ui.notify(
-				`Usage: /${command} <query> [--all] [--limit N], or /${command} alone to type the query in a dialog (TUI)`,
+				`Usage: /${command} <query> [--all] [--limit N] [--regex], or /${command} alone to type the query in a dialog (TUI)`,
 				"warning",
 			);
 			return;
@@ -385,7 +424,7 @@ export default function searchArchive(pi: ExtensionAPI) {
 		});
 		// Shown, never saved: a picker in the TUI, a notification elsewhere; no session entry, no file.
 		const scope = `scope: ${parsed.all ? "all projects" : `this project (${tilde(ctx.cwd)})`}`;
-		const query = `"${flat(parsed.query)}"`;
+		const query = `${parsed.regex ? "regex " : ""}"${flat(parsed.query)}"`;
 		if (!rows.length) {
 			ctx.ui.notify(`No results for ${query} · ${scope}`, "info");
 			return;
@@ -411,12 +450,12 @@ export default function searchArchive(pi: ExtensionAPI) {
 
 	pi.registerCommand("search-archive", {
 		description:
-			"Search past sessions' user and model messages. Usage: /search-archive <query> [--all] [--limit N]; bare: type the query in a dialog, kept out of prompt history",
+			"Search past sessions' user and model messages. Usage: /search-archive <query> [--all] [--limit N] [--regex]; bare: type the query in a dialog, kept out of prompt history",
 		handler: run("archive", "search-archive"),
 	});
 	pi.registerCommand("search-full", {
 		description:
-			"Search past sessions including thinking, tool calls and tool output. Usage: /search-full <query> [--all] [--limit N]; bare: type the query in a dialog, kept out of prompt history",
+			"Search past sessions including thinking, tool calls and tool output. Usage: /search-full <query> [--all] [--limit N] [--regex]; bare: type the query in a dialog, kept out of prompt history",
 		handler: run("full", "search-full"),
 	});
 }
