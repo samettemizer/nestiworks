@@ -350,11 +350,11 @@ const row: Row = {
 };
 
 test("layout: header, column order, padding, literal escaping", () => {
-	expect(layout([row], "archive", cell)).toEqual({
+	expect(layout([row], "archive")).toEqual({
 		head: "   Session        Project  Title    Date (UTC)  · Note below",
 		items: [{ label: "1. 01aaaaaa\\-0001  \\~\\/www\\/x  a \\| b c  11\\-20 10\\:01", description: "x\\|y z" }],
 	});
-	expect(layout([row], "full", cell)).toEqual({
+	expect(layout([row], "full")).toEqual({
 		head: "   Session        Project  Title    Date (UTC)   Location  · Note below",
 		items: [
 			{
@@ -363,17 +363,15 @@ test("layout: header, column order, padding, literal escaping", () => {
 			},
 		],
 	});
-	expect(layout([row], "archive", flat).items).toEqual([
-		{ label: "1. 01aaaaaa-0001  ~/www/x  a | b c  11-20 10:01", description: "x|y z" },
-	]);
 	// Ten rows: numbers padded after the dot (`1. ` keeps digit quick-pick); padding capped at 40 columns.
 	const rows = Array.from({ length: 10 }, (_, i) => ({ ...row, title: i === 9 ? "t".repeat(60) : "short" }));
-	const { head, items } = layout(rows, "archive", flat);
-	expect(items[0].label).toStartWith("1.  01aaaaaa-0001");
-	expect(items[9].label).toStartWith("10. 01aaaaaa-0001");
-	expect(items[0].label).toBe(`1.  01aaaaaa-0001  ~/www/x  short${" ".repeat(35)}  11-20 10:01`);
-	expect(items[9].label).toBe(`10. 01aaaaaa-0001  ~/www/x  ${"t".repeat(60)}  11-20 10:01`);
-	expect(head.indexOf("Date")).toBe(items[0].label.indexOf("11-20"));
+	const { head, items } = layout(rows, "archive");
+	expect(items[0].label).toStartWith("1.  01aaaaaa\\-0001");
+	expect(items[9].label).toStartWith("10. 01aaaaaa\\-0001");
+	expect(items[0].label).toBe(`1.  01aaaaaa\\-0001  \\~\\/www\\/x  short${" ".repeat(35)}  11\\-20 10\\:01`);
+	expect(items[9].label).toBe(`10. 01aaaaaa\\-0001  \\~\\/www\\/x  ${"t".repeat(60)}  11\\-20 10\\:01`);
+	// Padding is measured on the literal text, so columns line up once the escapes render.
+	expect(head.indexOf("Date")).toBe(4 + decodeInline(items[0].label.slice(4)).indexOf("11-20"));
 	expect(flat("  a\r\n\tb | c  ")).toBe("a b | c");
 	expect(cell("  a\r\n\tb | c  ")).toBe("a b \\| c");
 	expect(cell("a\\|b")).toBe("a\\\\\\|b");
@@ -418,7 +416,7 @@ test("escaped labels and notes round-trip to the literal text under omp's inline
 		{ ...base, session: "(x)", project: "[a](b)", title: "[x]", note: "$5 and $6 \\(m\\) \\[n\\] $$z$$ ~~s~~ ![i](j)" },
 		{ ...base, session: "s", project: "p", title: "trailing\\", location: "x  y", note: "" },
 	];
-	const { items } = layout(rows, "full", cell);
+	const { items } = layout(rows, "full");
 	rows.forEach((r, i) => {
 		// Columns are separated by two or more spaces; `flat` leaves at most one space inside a value.
 		expect(decodeInline(items[i].label.slice(3)).split(/ {2,}/)).toEqual(
@@ -465,32 +463,33 @@ test("argument parsing with --regex: any position, quoted patterns verbatim", ()
 	expect(parseArgs('--regex "x" --limit 0')).toBeUndefined();
 });
 
-test("commands: picker in the TUI resumes the pick, notification elsewhere, nothing sent or saved", async () => {
+test("commands: bare only; the dialog query opens the picker, which resumes the pick; nothing sent or saved", async () => {
 	const agentDir = await sessionsTree();
 	const root = join(agentDir, "sessions");
 	const leaked: unknown[] = [];
 	try {
-		const commands = new Map<string, (args: string, ctx: unknown) => Promise<void>>();
-		const pi = {
-			pi: { getAgentDir: () => agentDir },
-			registerCommand: (name: string, def: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
-				commands.set(name, def.handler),
-			sendMessage: (...args: unknown[]) => leaked.push(["sendMessage", args]),
-			sendUserMessage: (...args: unknown[]) => leaked.push(["sendUserMessage", args]),
-			appendEntry: (...args: unknown[]) => leaked.push(["appendEntry", args]),
+		type Command = { description: string; handler: (args: string, ctx: unknown) => Promise<void> };
+		const plugin = (dir: string) => {
+			const commands = new Map<string, Command>();
+			const pi = {
+				pi: { getAgentDir: () => dir },
+				registerCommand: (name: string, def: Command) => commands.set(name, def),
+				sendMessage: (...args: unknown[]) => leaked.push(["sendMessage", args]),
+				sendUserMessage: (...args: unknown[]) => leaked.push(["sendUserMessage", args]),
+				appendEntry: (...args: unknown[]) => leaked.push(["appendEntry", args]),
+			};
+			searchArchive(pi as never);
+			return commands;
 		};
-		searchArchive(pi as never);
+		const commands = plugin(agentDir);
 		expect([...commands.keys()]).toEqual(["search-archive", "search-full"]);
+		expect(commands.get("search-archive")?.description).toBe("Open the session search dialog (titles and messages)");
+		expect(commands.get("search-full")?.description).toBe(
+			"Open the full session search dialog (also thinking, tool calls and output)",
+		);
+		for (const { description } of commands.values()) expect(description).not.toMatch(/<query>|--|usage/i);
 
-		const ctx = (
-			mode: string,
-			o: {
-				pick?: (labels: string[]) => string | undefined;
-				cancelled?: boolean;
-				supportsEditor?: boolean;
-				typed?: string;
-			} = {},
-		) => {
+		const ctx = (mode: string, o: { pick?: (labels: string[]) => string | undefined; cancelled?: boolean; typed?: string } = {}) => {
 			const c = {
 				mode,
 				cwd: "/proj/a",
@@ -498,18 +497,24 @@ test("commands: picker in the TUI resumes the pick, notification elsewhere, noth
 				notes: [] as string[],
 				switched: [] as string[],
 				selects: [] as { title: string[]; items: Item[] }[],
-				inputs: [] as string[],
+				inputs: [] as unknown[][],
+				widgets: [] as [string, string[] | undefined][],
+				events: [] as string[],
 				sessionManager: { getSessionId: () => CURRENT },
 				switchSession: async (file: string) => {
 					c.switched.push(file);
 					return { cancelled: o.cancelled ?? false };
 				},
 				ui: {
-					input: async (title: string) => {
-						c.inputs.push(title);
+					input: async (...args: unknown[]) => {
+						c.inputs.push(args);
+						c.events.push("input");
 						return o.typed;
 					},
-					supportsEditor: o.supportsEditor,
+					setWidget: (key: string, lines?: string[]) => {
+						c.widgets.push([key, lines]);
+						c.events.push(lines ? "hints" : "clear");
+					},
 					select: async (title: string, items: Item[]) => {
 						c.selects.push({ title: title.split("\n"), items });
 						return o.pick?.(items.map(i => i.label));
@@ -520,12 +525,29 @@ test("commands: picker in the TUI resumes the pick, notification elsewhere, noth
 			};
 			return c;
 		};
-		const run = (name: string, args: string, c: ReturnType<typeof ctx>) => commands.get(name)?.(args, c);
-		const sessions = (c: ReturnType<typeof ctx>) => c.selects[0].items.map(i => i.label.split("  ")[0]);
+		type Ctx = ReturnType<typeof ctx>;
+		const run = (name: string, args: string, c: Ctx) => commands.get(name)?.handler(args, c);
+		const dialog = async (name: string, typed: string | undefined, o: Parameters<typeof ctx>[1] = {}) => {
+			const c = ctx("tui", { ...o, typed });
+			await run(name, "", c);
+			return c;
+		};
+		const sessions = (c: Ctx) => c.selects[0].items.map(i => i.label.split("  ")[0]);
+		const untouched = (c: Ctx) => [c.inputs, c.widgets, c.selects, c.switched, c.editor];
 
+		// Bare command: usage hints sit above the dialog while it is open; its title is the only text it shows.
+		const tui = await dialog("search-archive", "gcloud logging", { pick: labels => labels[0] });
+		expect(tui.events).toEqual(["hints", "input", "clear"]);
+		expect(tui.inputs).toEqual([['/search-archive: words or --regex "pattern" [--all] [--limit N]']]);
+		const [key, hints] = tui.widgets[0];
+		expect(tui.widgets[1]).toEqual([key, undefined]);
+		expect(hints).toEqual([
+			"Searches session titles, your messages and the model's replies (this project by default).",
+			"Words: each must start a word of the same message, in any order; case and accents are ignored.",
+			'--regex "pattern": one case-insensitive JavaScript regular expression on the raw text instead of words.',
+			"--all: every project · --limit N: at most N rows (default 50)",
+		]);
 		// Picking a same-project row resumes it.
-		const tui = ctx("tui", { pick: labels => labels[0], supportsEditor: true });
-		await run("search-archive", "gcloud logging", tui);
 		expect(tui.selects).toHaveLength(1);
 		expect(tui.selects[0].title).toEqual([
 			'3 results for "gcloud logging" · scope: this project (/proj/a)',
@@ -539,132 +561,109 @@ test("commands: picker in the TUI resumes the pick, notification elsewhere, noth
 		expect(tui.notes).toEqual([]);
 
 		// A vetoed switch falls back to prefilling `/resume` for that row.
-		const vetoed = ctx("tui", { pick: labels => labels[1], cancelled: true });
-		await run("search-archive", "gcloud logging", vetoed);
+		const vetoed = await dialog("search-archive", "gcloud logging", { pick: labels => labels[1], cancelled: true });
 		expect(vetoed.switched).toEqual([join(root, "-proj-a", "s1.jsonl")]);
 		expect(vetoed.editor).toEqual(["/resume 01aaaaaa-0001"]);
 
 		// Another project's row: no switch (omp would reject the cwd change), `/resume` prefilled.
-		const other = ctx("tui", { pick: labels => labels[1] });
-		await run("search-archive", "gcloud logging --all", other);
+		const other = await dialog("search-archive", "gcloud logging --all", { pick: labels => labels[1] });
 		expect(other.selects[0].title[0]).toBe('4 results for "gcloud logging" · scope: all projects');
 		expect(sessions(other)[1]).toBe("2. 01eeeeee\\-0004");
 		expect(other.switched).toEqual([]);
 		expect(other.editor).toEqual(["/resume 01eeeeee-0004"]);
 
-		// Esc: nothing happens.
-		const esc = ctx("tui", { pick: () => undefined, supportsEditor: true });
-		await run("search-full", "permission denied --all", esc);
+		// Esc in the picker: nothing happens. /search-full names its wider scope above its dialog.
+		const esc = await dialog("search-full", "permission denied --all", { pick: () => undefined });
+		expect(esc.inputs).toEqual([['/search-full: words or --regex "pattern" [--all] [--limit N]']]);
+		expect(esc.widgets[0][1]?.[0]).toBe(
+			"Searches session titles, your messages, the model's replies and thinking, tool calls and tool output (this project by default).",
+		);
 		expect(esc.selects[0].title[1]).toContain("  Location  · Note below");
 		expect(esc.selects[0].items.some(i => i.label.endsWith("  Tool output (bash)"))).toBe(true);
 		expect(esc.switched).toEqual([]);
 		expect(esc.editor).toEqual([]);
 
-		const none = ctx("tui", { supportsEditor: true });
-		await run("search-archive", "zzzz-nothing", none);
+		const none = await dialog("search-archive", "zzzz-nothing");
 		expect(none.notes).toEqual(['No results for "zzzz-nothing" · scope: this project (/proj/a)']);
-		await run("search-archive", "--all", none);
-		expect(none.notes[1]).toContain("Usage: /search-archive");
-		expect(none.selects).toEqual([]);
-		expect(none.editor).toEqual([]);
+		expect([none.selects, none.editor]).toEqual([[], []]);
 
-		const limit = ctx("tui");
-		await run("search-archive", "gcloud logging --limit 3", limit);
-		expect(limit.selects[0].title).toHaveLength(2);
-		await run("search-archive", "gcloud logging --limit 2", limit);
-		expect(limit.selects[1].title[1]).toBe("Showing the first 2 results; use --limit N for more.");
-
-		// Outside the TUI: one plain-text notification and the first-hit prefill where a composer exists.
-		const rpc = ctx("rpc", { supportsEditor: true });
-		await run("search-archive", "gcloud logging", rpc);
-		expect(rpc.selects).toEqual([]);
-		expect(rpc.notes).toHaveLength(1);
-		const report = rpc.notes[0].split("\n");
-		expect(report.slice(0, 3)).toEqual([
-			'3 results for "gcloud logging" · scope: this project (/proj/a)',
-			"",
-			"   Session        Project  Title            Date (UTC)  · Note below",
-		]);
-		expect(report[3]).toStartWith("1. 01dddddd-0003  /proj/a  ");
-		expect(report[4]).toBe("    Cloud Logging + gcloud");
-		expect(rpc.editor).toEqual(["/resume 01dddddd-0003"]);
-		expect(rpc.switched).toEqual([]);
-
-		const print = ctx("print");
-		await run("search-archive", "gcloud logging", print);
-		expect(print.notes).toHaveLength(1);
-		expect(print.editor).toEqual([]);
-
-		// Bare command in the TUI: the query is typed into a dialog, same syntax as inline.
-		const dialog = ctx("tui", { typed: "gcloud logging --all --limit 2", pick: () => undefined });
-		await run("search-full", "  ", dialog);
-		expect(dialog.inputs).toEqual(["/search-full: search past sessions"]);
-		expect(dialog.selects[0].title).toEqual([
+		expect((await dialog("search-archive", "gcloud logging --limit 3")).selects[0].title).toHaveLength(2);
+		const limit = await dialog("search-full", "gcloud logging --all --limit 2", { pick: () => undefined });
+		expect(limit.selects[0].title).toEqual([
 			'2 results for "gcloud logging" · scope: all projects',
 			"Showing the first 2 results; use --limit N for more.",
 			"   Session        Project  Title  Date (UTC)   Location  · Note below",
 		]);
 
-		// Dialog dismissed or left empty: nothing at all.
-		for (const typed of [undefined, "   "]) {
+		// Dialog dismissed or left empty (bare or whitespace-only command): nothing at all.
+		for (const [args, typed] of [["", undefined], ["  ", "   "]] as const) {
 			const dismissed = ctx("tui", { typed });
-			await run("search-archive", "", dismissed);
-			expect(dismissed.inputs).toHaveLength(1);
+			await run("search-archive", args, dismissed);
+			expect(dismissed.events).toEqual(["hints", "input", "clear"]);
 			expect([dismissed.selects, dismissed.notes, dismissed.editor, dismissed.switched]).toEqual([[], [], [], []]);
 		}
 
-		// Invalid dialog input: usage warning.
-		const invalid = ctx("tui", { typed: "--all --limit 0" });
-		await run("search-archive", "", invalid);
-		expect(invalid.notes).toHaveLength(1);
-		expect(invalid.notes[0]).toContain("Usage: /search-archive");
-		expect(invalid.selects).toEqual([]);
-
-		// Outside the TUI a bare command has no dialog: usage warning.
-		const bare = ctx("rpc", { typed: "gcloud logging", supportsEditor: true });
-		await run("search-archive", "", bare);
-		expect(bare.inputs).toEqual([]);
-		expect(bare.notes).toHaveLength(1);
-		expect(bare.notes[0]).toContain("Usage: /search-archive");
-		expect(bare.editor).toEqual([]);
+		// Invalid dialog input (flags without a query, a bad limit): one warning, no search.
+		for (const typed of ["--all --limit 0", "--regex", "--all"]) {
+			const invalid = await dialog("search-archive", typed);
+			expect(invalid.notes).toEqual([
+				'Nothing was searched: type words or --regex "pattern", optionally with --all and --limit N (N at least 1).',
+			]);
+			expect(invalid.selects).toEqual([]);
+		}
 
 		// --regex: infix hits word mode misses; heading marks the pattern as a regex.
-		const words = ctx("tui");
-		await run("search-archive", "loud logging", words);
+		const words = await dialog("search-archive", "loud logging");
 		expect(words.notes).toEqual(['No results for "loud logging" · scope: this project (/proj/a)']);
-		const regex = ctx("tui", { pick: () => undefined });
-		await run("search-archive", '--regex "LOUD\\s+logging"', regex);
+		const regex = await dialog("search-archive", '--regex "LOUD\\s+logging"', { pick: () => undefined });
 		expect(regex.selects[0].title[0]).toBe('3 results for regex "LOUD\\s+logging" · scope: this project (/proj/a)');
 		expect(sessions(regex)).toEqual(["1. 01dddddd\\-0003", "2. 01aaaaaa\\-0001", "3. 01aaaaaa\\-0001"]);
 
-		// --regex with --all on /search-full reaches tool output in other positions too.
-		const full = ctx("rpc");
-		await run("search-full", '"permission (denied|granted)" --all --regex', full);
-		expect(full.notes).toHaveLength(1);
-		const lines = full.notes[0].split("\n");
-		expect(lines[0]).toBe('1 results for regex "permission (denied|granted)" · scope: all projects');
-		expect(lines[3]).toEndWith("  Tool output (bash)");
-		expect(lines[4]).toBe("    ERROR: gcloud logging: permission denied");
+		// --regex with --all on /search-full reaches tool output, flags in any position.
+		const full = await dialog("search-full", '"permission (denied|granted)" --all --regex', { pick: () => undefined });
+		expect(full.selects[0].title[0]).toBe('1 results for regex "permission (denied|granted)" · scope: all projects');
+		expect(full.selects[0].items[0].label).toEndWith("  Tool output (bash)");
+		expect(full.selects[0].items[0].description).toBe("ERROR\\: gcloud logging\\: permission denied");
+
+		const anchored = await dialog("search-archive", '--all --regex "^gcloud logging in"', { pick: () => undefined });
+		expect(anchored.selects[0].title[0]).toBe('1 results for regex "^gcloud logging in" · scope: all projects');
+		expect(sessions(anchored)).toEqual(["1. 01eeeeee\\-0004"]);
 
 		// Invalid pattern: one clear warning, no search, no picker.
 		for (const name of ["search-archive", "search-full"]) {
-			const bad = ctx("tui", { supportsEditor: true });
-			await run(name, '--regex "(" --all', bad);
+			const bad = await dialog(name, '--regex "(" --all');
 			expect(bad.notes).toEqual(['Invalid regular expression "(": missing ). Nothing was searched.']);
 			expect([bad.selects, bad.editor, bad.switched]).toEqual([[], [], []]);
 		}
 
-		// Bare --regex is a flag without a query: usage, like --all alone.
-		const flagOnly = ctx("tui");
-		await run("search-full", "--regex", flagOnly);
-		expect(flagOnly.inputs).toEqual([]);
-		expect(flagOnly.notes[0]).toContain("Usage: /search-full <query> [--all] [--limit N] [--regex]");
+		// Any text after the command (already in omp's prompt history): refused with a warning that names
+		// the history file and never repeats the text; no dialog, no search.
+		for (const name of ["search-archive", "search-full"]) {
+			for (const args of ["gcloud logging", "--help", "--all", "--regex", "  --limit 5 "]) {
+				const inline = ctx("tui", { typed: "gcloud logging", pick: labels => labels[0] });
+				await run(name, args, inline);
+				expect(inline.notes).toEqual([
+					`Nothing was searched. The text you typed after /${name} is now saved in omp's prompt history (${tilde(join(agentDir, "history.db"))}), which agents can read. Run /${name} alone and type the query into its dialog.`,
+				]);
+				expect(inline.notes[0]).not.toContain(args.trim());
+				expect(untouched(inline)).toEqual([[], [], [], [], []]);
+			}
+		}
+		const home = ctx("tui");
+		await plugin(join(homedir(), ".omp", "agent")).get("search-full")?.handler("x", home);
+		expect(home.notes[0]).toContain("prompt history (~/.omp/agent/history.db), which agents can read.");
 
-		// The dialog takes --regex like any other flag.
-		const regexDialog = ctx("tui", { typed: '--all --regex "^gcloud logging in"', pick: () => undefined });
-		await run("search-archive", "", regexDialog);
-		expect(regexDialog.selects[0].title[0]).toBe('1 results for regex "^gcloud logging in" · scope: all projects');
-		expect(sessions(regexDialog)).toEqual(["1. 01eeeeee\\-0004"]);
+		// Outside the TUI no host is known to show the dialog: one notice, bare or not, nothing searched.
+		for (const mode of ["rpc", "print"]) {
+			for (const args of ["", "gcloud logging"]) {
+				const c = ctx(mode, { typed: "gcloud logging", pick: labels => labels[0] });
+				await run("search-archive", args, c);
+				expect(c.notes).toEqual([
+					"/search-archive needs omp's interactive TUI: run it alone there and type the query into its dialog. Nothing was searched.",
+				]);
+				expect(untouched(c)).toEqual([[], [], [], [], []]);
+			}
+		}
 	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}

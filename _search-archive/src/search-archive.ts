@@ -360,11 +360,11 @@ export interface Item {
 
 /**
  * Picker rows: `head` names the columns; each label is `i. ` and the row's columns padded to line up
- * (padding capped at COLUMN_CAP, longer values overflow) and its description is the note. `escape`
- * makes a value show literally on the target surface; padding stays outside it. The number keeps
- * labels unique and gives `1.`-`9.` the selector's digit quick-pick.
+ * (padding capped at COLUMN_CAP, longer values overflow) and its description is the note. Values are
+ * escaped with `cell` so they show literally; padding stays outside it. The number keeps labels unique
+ * and gives `1.`-`9.` the selector's digit quick-pick.
  */
-export function layout(rows: Row[], mode: Mode, escape: (text: string) => string): { head: string; items: Item[] } {
+export function layout(rows: Row[], mode: Mode): { head: string; items: Item[] } {
 	const full = mode === "full";
 	const names = ["Session", "Project", "Title", "Date (UTC)", ...(full ? ["Location"] : [])];
 	const table = rows.map(r =>
@@ -381,22 +381,54 @@ export function layout(rows: Row[], mode: Mode, escape: (text: string) => string
 	return {
 		head: `${" ".repeat(number)}${line(names, flat)}  · Note below`,
 		items: table.map((cells, i) => ({
-			label: `${i + 1}.`.padEnd(number) + line(cells, escape),
-			description: escape(rows[i].note),
+			label: `${i + 1}.`.padEnd(number) + line(cells, cell),
+			description: cell(rows[i].note),
 		})),
 	};
 }
 
+const HINTS_WIDGET = "search-archive-hints";
+
+/** Usage lines shown above the dialog: omp's input dialog shows only a one-line title, no placeholder. */
+function hints(mode: Mode): string[] {
+	return [
+		mode === "full"
+			? "Searches session titles, your messages, the model's replies and thinking, tool calls and tool output (this project by default)."
+			: "Searches session titles, your messages and the model's replies (this project by default).",
+		"Words: each must start a word of the same message, in any order; case and accents are ignored.",
+		'--regex "pattern": one case-insensitive JavaScript regular expression on the raw text instead of words.',
+		"--all: every project · --limit N: at most N rows (default 50)",
+	];
+}
+
 export default function searchArchive(pi: ExtensionAPI) {
 	const run = (mode: Mode, command: string) => async (args: string, ctx: ExtensionCommandContext) => {
-		// omp's prompt history keeps every typed command line; a query typed into this dialog stays out of it.
-		let text = args;
-		if (!text.trim() && ctx.mode === "tui") {
-			const typed = await ctx.ui.input(`/${command}: search past sessions`, "<query> [--all] [--limit N] [--regex]");
-			if (!typed?.trim()) return;
-			text = typed;
+		// omp's prompt history (history.db, readable by agents) keeps every command line typed in the
+		// composer, so the query is accepted only in the dialog; text after the command is refused.
+		if (ctx.mode !== "tui") {
+			ctx.ui.notify(
+				`/${command} needs omp's interactive TUI: run it alone there and type the query into its dialog. Nothing was searched.`,
+				"warning",
+			);
+			return;
 		}
-		const parsed = parseArgs(text);
+		if (args.trim()) {
+			const history = tilde(join(pi.pi.getAgentDir(), "history.db"));
+			ctx.ui.notify(
+				`Nothing was searched. The text you typed after /${command} is now saved in omp's prompt history (${history}), which agents can read. Run /${command} alone and type the query into its dialog.`,
+				"warning",
+			);
+			return;
+		}
+		ctx.ui.setWidget(HINTS_WIDGET, hints(mode));
+		let typed: string | undefined;
+		try {
+			typed = await ctx.ui.input(`/${command}: words or --regex "pattern" [--all] [--limit N]`);
+		} finally {
+			ctx.ui.setWidget(HINTS_WIDGET, undefined);
+		}
+		if (!typed?.trim()) return;
+		const parsed = parseArgs(typed);
 		let matcher: Matcher | undefined;
 		try {
 			matcher = parsed && (parsed.regex ? compileRegex(parsed.query) : compileQuery(parsed.query));
@@ -407,10 +439,7 @@ export default function searchArchive(pi: ExtensionAPI) {
 			return;
 		}
 		if (!parsed || !matcher) {
-			ctx.ui.notify(
-				`Usage: /${command} <query> [--all] [--limit N] [--regex], or /${command} alone to type the query in a dialog (TUI)`,
-				"warning",
-			);
+			ctx.ui.notify('Nothing was searched: type words or --regex "pattern", optionally with --all and --limit N (N at least 1).', "warning");
 			return;
 		}
 		const { rows, limited } = await search({
@@ -422,7 +451,7 @@ export default function searchArchive(pi: ExtensionAPI) {
 			mode,
 			limit: parsed.limit,
 		});
-		// Shown, never saved: a picker in the TUI, a notification elsewhere; no session entry, no file.
+		// Shown, never saved: a picker; no session entry, no file.
 		const scope = `scope: ${parsed.all ? "all projects" : `this project (${tilde(ctx.cwd)})`}`;
 		const query = `${parsed.regex ? "regex " : ""}"${flat(parsed.query)}"`;
 		if (!rows.length) {
@@ -431,14 +460,7 @@ export default function searchArchive(pi: ExtensionAPI) {
 		}
 		const heading = [`${rows.length} results for ${query} · ${scope}`];
 		if (limited) heading.push(`Showing the first ${parsed.limit} results; use --limit N for more.`);
-		if (ctx.mode !== "tui") {
-			const { head, items } = layout(rows, mode, flat);
-			const report = items.flatMap(i => (i.description ? [i.label, `    ${i.description}`] : [i.label]));
-			ctx.ui.notify([...heading, "", head, ...report].join("\n"), "info");
-			if (ctx.ui.supportsEditor === true) ctx.ui.setEditorText(`/resume ${rows[0].session}`);
-			return;
-		}
-		const { head, items } = layout(rows, mode, cell);
+		const { head, items } = layout(rows, mode);
 		const picked = await ctx.ui.select([...heading, head].join("\n"), items);
 		const row = rows[items.findIndex(i => i.label === picked)];
 		if (!row) return;
@@ -449,13 +471,11 @@ export default function searchArchive(pi: ExtensionAPI) {
 	};
 
 	pi.registerCommand("search-archive", {
-		description:
-			"Search past sessions' user and model messages. Usage: /search-archive <query> [--all] [--limit N] [--regex]; bare: type the query in a dialog, kept out of prompt history",
+		description: "Open the session search dialog (titles and messages)",
 		handler: run("archive", "search-archive"),
 	});
 	pi.registerCommand("search-full", {
-		description:
-			"Search past sessions including thinking, tool calls and tool output. Usage: /search-full <query> [--all] [--limit N] [--regex]; bare: type the query in a dialog, kept out of prompt history",
+		description: "Open the full session search dialog (also thinking, tool calls and output)",
 		handler: run("full", "search-full"),
 	});
 }
