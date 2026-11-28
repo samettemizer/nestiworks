@@ -1,6 +1,6 @@
 # nestiworks-laravel
 
-An [omp](https://omp.sh) plugin that adds an opt-in **CTO team mode** for Laravel projects.
+An [omp](https://omp.sh) plugin that adds an opt-in **team mode** for Laravel projects.
 
 When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `nesti-developer` subagent, approves the developer's plan, sends the result to a `nesti-reviewer` subagent and relays `MUST_FIX` items. Analysis or plan-only requests stop after the plan. When the review approves in round 1 or 2, the developer commits the change as [Conventional Commits](https://www.conventionalcommits.org/) checked by [commitizen](https://commitizen-tools.github.io/commitizen/); nothing is pushed unless you ask. A review that cannot run a required check returns `blocked`: the CTO resolves it or asks you, and it never counts as a rejection. After the second rejection it opens an unlabelled GitLab issue through Nesti MCP, spawns the `nesti-advisor` and gives the developer one final attempt, which is never committed: approved → the issue is closed with `omp-developer / model: <model>` and the change stays uncommitted in your working tree; rejected → the issue gets the `nesti` label and Nesti's pipeline takes over. It prints a status line at every phase change (`▶ [n/6 Phase] ...`) in your language.
 

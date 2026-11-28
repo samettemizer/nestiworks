@@ -1,7 +1,7 @@
 {
 	"name": "nestiworks",
 	"metadata": {
-		"description": "CTO team modes for programming/script languages. Agents: developer, reviewer or advisor subagents with Nesti escalation."
+		"description": "Team modes for programming/script languages. Agents: developer, reviewer or advisor subagents with Nesti escalation."
 	},
 	"owner": {
 		"name": "github.com/samettemizer"
@@ -18,7 +18,7 @@
 		{
 			"name": "angular",
 			"source": "./angular",
-			"description": "Angular CTO team: version-aware reactivity, DI scopes and component lifetimes",
+			"description": "Angular team: version-aware reactivity, DI scopes and component lifetimes",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -26,7 +26,7 @@
 		{
 			"name": "c",
 			"source": "./c",
-			"description": "C CTO team: buffer bounds, explicit ownership and undefined-behavior prevention",
+			"description": "C team: buffer bounds, explicit ownership and undefined-behavior prevention",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -34,7 +34,7 @@
 		{
 			"name": "cpp",
 			"source": "./cpp",
-			"description": "C++ CTO team: RAII, iterator validity and thread/resource lifetimes",
+			"description": "C++ team: RAII, iterator validity and thread/resource lifetimes",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -42,7 +42,7 @@
 		{
 			"name": "csharp",
 			"source": "./csharp",
-			"description": "C# CTO team: async cancellation, disposable ownership and HTTP client lifetimes",
+			"description": "C# team: async cancellation, disposable ownership and HTTP client lifetimes",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -50,7 +50,7 @@
 		{
 			"name": "dart",
 			"source": "./dart",
-			"description": "Dart CTO team: SDK/platform boundaries, Future failures and stream ownership",
+			"description": "Dart team: SDK/platform boundaries, Future failures and stream ownership",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -58,7 +58,7 @@
 		{
 			"name": "delphi",
 			"source": "./delphi",
-			"description": "Delphi CTO team: ownership, exception safety and UI-thread boundaries",
+			"description": "Delphi team: ownership, exception safety and UI-thread boundaries",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -66,7 +66,7 @@
 		{
 			"name": "django",
 			"source": "./django",
-			"description": "Django CTO team: historical migrations, transactions and async ORM safety",
+			"description": "Django team: historical migrations, transactions and async ORM safety",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -74,7 +74,7 @@
 		{
 			"name": "fastapi",
 			"source": "./fastapi",
-			"description": "FastAPI CTO team: ASGI concurrency, dependency lifetime and response contracts",
+			"description": "FastAPI team: ASGI concurrency, dependency lifetime and response contracts",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -82,7 +82,7 @@
 		{
 			"name": "go",
 			"source": "./go",
-			"description": "Go CTO team: module targets, goroutine termination and cancellation propagation",
+			"description": "Go team: module targets, goroutine termination and cancellation propagation",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -90,7 +90,7 @@
 		{
 			"name": "java",
 			"source": "./java",
-			"description": "Java CTO team: resource ownership, equality contracts and shared-state safety",
+			"description": "Java team: resource ownership, equality contracts and shared-state safety",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -98,7 +98,7 @@
 		{
 			"name": "javascript",
 			"source": "./javascript",
-			"description": "JavaScript CTO team: module interop, promise failures and safe input boundaries",
+			"description": "JavaScript team: module interop, promise failures and safe input boundaries",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -106,7 +106,7 @@
 		{
 			"name": "kotlin",
 			"source": "./kotlin",
-			"description": "Kotlin CTO team: platform-aware coroutines, lifecycle cancellation and shared state",
+			"description": "Kotlin team: platform-aware coroutines, lifecycle cancellation and shared state",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -114,7 +114,7 @@
 		{
 			"name": "laravel",
 			"source": "./laravel",
-			"description": "Laravel CTO team: authorization boundaries, committed side effects and Nesti escalation",
+			"description": "Laravel team: authorization boundaries, committed side effects and Nesti escalation",
 			"version": "1.4.0",
 			"license": "MIT",
 			"category": "development"
@@ -122,7 +122,7 @@
 		{
 			"name": "nextjs",
 			"source": "./nextjs",
-			"description": "Next.js CTO team: router-aware server boundaries, authorization and caching",
+			"description": "Next.js team: router-aware server boundaries, authorization and caching",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -130,7 +130,7 @@
 		{
 			"name": "php",
 			"source": "./php",
-			"description": "PHP CTO team: platform-aware loading, failure channels and SQL/output safety",
+			"description": "PHP team: platform-aware loading, failure channels and SQL/output safety",
 			"version": "1.1.2",
 			"license": "MIT",
 			"category": "development"
@@ -138,7 +138,7 @@
 		{
 			"name": "python",
 			"source": "./python",
-			"description": "Python CTO team: async boundaries, worker cancellation and resource ownership",
+			"description": "Python team: async boundaries, worker cancellation and resource ownership",
 			"version": "1.2.0",
 			"license": "MIT",
 			"category": "development"
@@ -146,7 +146,7 @@
 		{
 			"name": "rails",
 			"source": "./rails",
-			"description": "Rails CTO team: parameter boundaries, migrations and committed side effects",
+			"description": "Rails team: parameter boundaries, migrations and committed side effects",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -154,7 +154,7 @@
 		{
 			"name": "react",
 			"source": "./react",
-			"description": "React CTO team: render identity, effect synchronization and UI behavior",
+			"description": "React team: render identity, effect synchronization and UI behavior",
 			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"
@@ -162,7 +162,7 @@
 		{
 			"name": "ruby",
 			"source": "./ruby",
-			"description": "Ruby CTO team: loader contracts, mutation ownership and safe dynamic dispatch",
+			"description": "Ruby team: loader contracts, mutation ownership and safe dynamic dispatch",
 			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"
@@ -170,7 +170,7 @@
 		{
 			"name": "rust",
 			"source": "./rust",
-			"description": "Rust CTO team: ownership, unsafe invariants and async executor progress",
+			"description": "Rust team: ownership, unsafe invariants and async executor progress",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -178,7 +178,7 @@
 		{
 			"name": "springboot",
 			"source": "./springboot",
-			"description": "Spring Boot CTO team: managed versions, transaction proxies and web-stack boundaries",
+			"description": "Spring Boot team: managed versions, transaction proxies and web-stack boundaries",
 			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"
@@ -186,7 +186,7 @@
 		{
 			"name": "swift",
 			"source": "./swift",
-			"description": "Swift CTO team: actor isolation, ARC lifetimes and deployment-aware APIs",
+			"description": "Swift team: actor isolation, ARC lifetimes and deployment-aware APIs",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -194,7 +194,7 @@
 		{
 			"name": "typescript",
 			"source": "./typescript",
-			"description": "TypeScript CTO team: compiler/runtime alignment, boundary validation and promises",
+			"description": "TypeScript team: compiler/runtime alignment, boundary validation and promises",
 			"version": "1.1.0",
 			"license": "MIT",
 			"category": "development"
@@ -202,7 +202,7 @@
 		{
 			"name": "vue",
 			"source": "./vue",
-			"description": "Vue CTO team: reactive identity, watcher cleanup and SSR isolation",
+			"description": "Vue team: reactive identity, watcher cleanup and SSR isolation",
 			"version": "1.0.1",
 			"license": "MIT",
 			"category": "development"

@@ -1,6 +1,6 @@
 # nestiworks-kotlin
 
-An [omp](https://omp.sh) plugin that adds an opt-in **CTO team mode** for Kotlin projects.
+An [omp](https://omp.sh) plugin that adds an opt-in **team mode** for Kotlin projects.
 
 When CTO mode is on, the main agent becomes a CTO: it does not edit code itself. It writes a spec, sends the work to a `developer` subagent, approves the developer's plan, sends the result to a `reviewer` subagent, relays `MUST_FIX` items until the review passes, then automatically delegates the approved commit and waits for its hash before reporting back to you (unless you explicitly forbid commits or there is no change to commit). It prints a status line at every phase change (`▶ [n/5 Phase] ...`) in your language.
 

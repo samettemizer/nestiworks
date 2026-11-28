@@ -1,6 +1,6 @@
 # nestiworks
 
-A marketplace of 26 plugins for [oh-my-pi (omp)](https://omp.sh/): language- and framework-focused CTO team modes, a generic option, plus one utility. The CTO coordinates planning, implementation and review through specialist agents.
+A marketplace of 26 plugins for [oh-my-pi (omp)](https://omp.sh/): language- and framework-focused team modes, a generic option, plus one utility. The CTO coordinates planning, implementation and review through specialist agents.
 
 ## Get started
 
@@ -50,7 +50,7 @@ See the official [omp marketplace documentation](https://github.com/can1357/oh-m
 
 ### Utilities
 
-Utilities are not team modes: they add no `/cto` or agents and can be installed alongside any team-mode plugin.
+Utilities are not team modes: they can be installed alongside any team-mode plugin.
 
 | Plugin | Focus |
 | --- | --- |
@@ -62,4 +62,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for PR and commit guidelines.
 
 ## License
 
-[MIT](LICENSE)
+· Under the MIT License. See [LICENSE](LICENSE) for details.<br>
+· Nestiworks plugins are fork of [omp-team-mode](https://github.com/hketen/omp-team-mode) by [@hketen](https://github.com/hketen/)

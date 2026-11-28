@@ -1,6 +1,6 @@
 # nestiworks-rails
 
-An [omp](https://omp.sh) plugin providing opt-in **CTO team mode** for Rails projects.
+An [omp](https://omp.sh) plugin providing opt-in **team mode** for Rails projects.
 
 The main agent coordinates rather than edits: spec → developer plan → CTO `APPROVED` → implementation → read-only reviewer → relayed `MUST_FIX` rounds → CTO `COMMIT` → confirmed commit → report (unless you explicitly forbid commits or there is no change to commit). After three rejected reviews, the CTO asks you how to proceed. Developer and reviewer communicate only through the CTO. Phase updates use your language. Turning the mode off stops CTO prompt injection, not agent overrides.
 
